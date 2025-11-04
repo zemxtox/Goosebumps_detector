@@ -1,0 +1,46 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="720" viewBox="0 0 1280 720">
+  <!-- Background -->
+  <rect width="1280" height="720" fill="#013D5A"/>
+  
+  <!-- Header -->
+  <rect x="40" y="40" width="1200" height="100" rx="15" fill="rgba(255, 255, 255, 0.05)" stroke="rgba(255, 255, 255, 0.1)" stroke-width="1"/>
+  <text x="640" y="90" font-family="Inter, sans-serif" font-size="36" font-weight="bold" fill="#FCF3E3" text-anchor="middle">Goosebumps Detector</text>
+  <text x="640" y="120" font-family="Inter, sans-serif" font-size="18" fill="#BDD3CE" text-anchor="middle">Real-time goosebump detection and analysis</text>
+  
+  <!-- Video container -->
+  <rect x="40" y="160" width="640" height="480" rx="15" fill="#000" stroke="rgba(255, 255, 255, 0.1)" stroke-width="1"/>
+  
+  <!-- Camera controls -->
+  <rect x="40" y="660" width="640" height="40" rx="8" fill="rgba(255, 255, 255, 0.05)"/>
+  <circle cx="70" cy="680" r="15" fill="#F4A258"/>
+  <circle cx="110" cy="680" r="15" fill="#708C69"/>
+  <rect x="150" y="670" width="100" height="20" rx="10" fill="rgba(255, 255, 255, 0.2)"/>
+  
+  <!-- Dashboard panels -->
+  <rect x="700" y="160" width="540" height="220" rx="15" fill="rgba(255, 255, 255, 0.05)" stroke="rgba(255, 255, 255, 0.1)" stroke-width="1"/>
+  <text x="730" y="190" font-family="Inter, sans-serif" font-size="24" font-weight="bold" fill="#FCF3E3">Live Detection</text>
+  
+  <!-- Graph visualization -->
+  <rect x="720" y="210" width="500" height="150" rx="8" fill="rgba(0, 0, 0, 0.2)"/>
+  <path d="M720,310 Q770,260 820,290 Q870,320 920,270 Q970,220 1020,280 Q1070,340 1120,290 Q1170,240 1220,260" stroke="#F4A258" stroke-width="3" fill="none"/>
+  
+  <!-- Stats panel -->
+  <rect x="700" y="400" width="260" height="300" rx="15" fill="rgba(255, 255, 255, 0.05)" stroke="rgba(255, 255, 255, 0.1)" stroke-width="1"/>
+  <text x="730" y="430" font-family="Inter, sans-serif" font-size="24" font-weight="bold" fill="#FCF3E3">Statistics</text>
+  
+  <!-- Stats items -->
+  <rect x="720" y="450" width="220" height="40" rx="8" fill="rgba(0, 0, 0, 0.2)"/>
+  <rect x="720" y="500" width="220" height="40" rx="8" fill="rgba(0, 0, 0, 0.2)"/>
+  <rect x="720" y="550" width="220" height="40" rx="8" fill="rgba(0, 0, 0, 0.2)"/>
+  <rect x="720" y="600" width="220" height="40" rx="8" fill="rgba(0, 0, 0, 0.2)"/>
+  
+  <!-- Settings panel -->
+  <rect x="980" y="400" width="260" height="300" rx="15" fill="rgba(255, 255, 255, 0.05)" stroke="rgba(255, 255, 255, 0.1)" stroke-width="1"/>
+  <text x="1010" y="430" font-family="Inter, sans-serif" font-size="24" font-weight="bold" fill="#FCF3E3">Settings</text>
+  
+  <!-- Settings controls -->
+  <rect x="1000" y="450" width="220" height="40" rx="8" fill="rgba(0, 0, 0, 0.2)"/>
+  <rect x="1000" y="500" width="220" height="40" rx="8" fill="rgba(0, 0, 0, 0.2)"/>
+  <rect x="1000" y="550" width="140" height="40" rx="20" fill="#F4A258"/>
+  <text x="1070" y="575" font-family="Inter, sans-serif" font-size="16" font-weight="bold" fill="#013D5A" text-anchor="middle">Reset Baseline</text>
+</svg>
