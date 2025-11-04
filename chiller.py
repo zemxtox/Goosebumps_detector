@@ -543,11 +543,7 @@ if __name__ == "__main__":
     
     # Start background tasks
     start_background_tasks()
-    
-    # Run the server
-    # In production environments like Railway, we need to ensure the server is accessible
-
-  socketio.run(
+    socketio.run(
         app, 
         host=HOST, 
         port=PORT, 
@@ -555,4 +551,9 @@ if __name__ == "__main__":
         # ADD THIS LINE TO FIX THE RUNTIME ERROR
         allow_unsafe_werkzeug=True
     )
+    
+    # Run the server
+    # In production environments like Railway, we need to ensure the server is accessible
+
+  
 
