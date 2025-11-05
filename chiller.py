@@ -696,15 +696,16 @@ if __name__ == "__main__":
         # Option 1: Try eventlet
         try:
             import eventlet
-            print(" 🔧 Using Eventlet server (recommended for SocketIO)")
-            socketio.run(app, host=HOST, port=PORT, debug=False, 
-                            allow_unsafe_werkzeug=True, 
-                            server='gevent')
-            except ImportError:
-                # Last resort - allow unsafe werkzeug for production
-                print(" ⚠️ Using Werkzeug in production (not recommended)")
-                socketio.run(app, host=HOST, port=PORT, debug=False, 
-                            allow_unsafe_werkzeug=True)
+            print("🔧 Using Eventlet server (recommended for SocketIO)")
+            socketio.run(app, host=HOST, port=PORT, debug=False,
+                 allow_unsafe_werkzeug=True,
+                 server='gevent')
+        except ImportError:
+            # Last resort - allow unsafe werkzeug for production
+            print("⚠️ Using Werkzeug in production (not recommended)")
+            socketio.run(app, host=HOST, port=PORT, debug=False,
+                 allow_unsafe_werkzeug=True)
+
     else:
         # Development server
         print(f" 🏠 Starting development server on {HOST}:{PORT}")
