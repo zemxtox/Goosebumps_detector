@@ -697,38 +697,14 @@ if __name__ == "__main__":
         try:
             import eventlet
             print(" 🔧 Using Eventlet server (recommended for SocketIO)")
-            socketio.run(app, host=HOST, port=PORT, debug=False, 
-                        server='eventlet', use_reloader=False, log_output=True)
-            server_started = True
-        except ImportError:
-            print(" ⚠️ Eventlet not available")
-        except Exception as e:
-            print(f" ⚠️ Eventlet failed: {e}")
-        
-        # Option 2: Try gevent if eventlet failed
-        if not server_started:
-            try:
-                import gevent
-                print(" 🔧 Using Gevent server")
-                socketio.run(app, host=HOST, port=PORT, debug=False, 
-                            server='gevent', use_reloader=False, log_output=True)
-                server_started = True
+            socketio.run(app, host=HOST, pT, port=PORT, debug=False, 
+                            allow_unsafe_werkzeug=True, 
+                            server='gevent')
             except ImportError:
-                print(" ⚠️ Gevent not available")
-            except Exception as e:
-                print(f" ⚠️ Gevent failed: {e}")
-        
-        # Option 3: Last resort - threading with unsafe werkzeug
-        if not server_started:
-            print(" ⚠️ Using threading server (not optimal for production)")
-            try:
+                # Last resort - allow unsafe werkzeug for production
+                print(" ⚠️ Using Werkzeug in production (not recommended)")
                 socketio.run(app, host=HOST, port=PORT, debug=False, 
-                            allow_unsafe_werkzeug=True, use_reloader=False, 
-                            log_output=True)
-            except Exception as e:
-                print(f" ❌ All server options failed: {e}")
-                print(" 💡 Try running: pip install eventlet gevent")
-                raise
+                            allow_unsafe_werkzeug=True)
     else:
         # Development server
         print(f" 🏠 Starting development server on {HOST}:{PORT}")
