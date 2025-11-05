@@ -1,25 +1,50 @@
 #!/usr/bin/env python3
 """
-WSGI entry point for Gunicorn deployment
+WSGI entry point for Gunicorn deployment with Flask-SocketIO
 """
+
+# Import eventlet and monkey patch BEFORE importing anything else
+import eventlet
+eventlet.monkey_patch()
+
 import os
 import threading
-from chiller import app, socketio, start_background_tasks, process_loop
+import time
 
-# Initialize background tasks when the application starts
-print("[INFO] Initializing CHILLER for Gunicorn deployment...")
+def create_application():
+    """Create and initialize the WSGI application."""
+    # Import after monkey patching
+    from chiller import app, socketio, start_background_tasks, process_loop
+    
+    print("[INFO] Initializing CHILLER for Gunicorn deployment...")
+    
+    # Initialize background tasks
+    try:
+        start_background_tasks()
+        print("[INFO] Background tasks started")
+    except Exception as e:
+        print(f"[ERROR] Failed to start background tasks: {e}")
+    
+    # Start real-time processing thread
+    try:
+        processing_thread = threading.Thread(target=process_loop, daemon=True)
+        processing_thread.start()
+        print("[INFO] Real-time processing thread started")
+    except Exception as e:
+        print(f"[ERROR] Failed to start processing thread: {e}")
+    
+    # Give a moment for initialization
+    time.sleep(0.1)
+    
+    print("[INFO] CHILLER initialization complete")
+    
+    # Return the SocketIO WSGI application
+    return socketio
 
-# Start background tasks
-start_background_tasks()
-
-# Start real-time processing thread
-processing_thread = threading.Thread(target=process_loop, daemon=True)
-processing_thread.start()
-print("[INFO] Real-time processing thread started")
-
-# Export the SocketIO app for Gunicorn
-application = socketio
+# Create the application instance
+application = create_application()
 
 if __name__ == "__main__":
-    # This won't be called when using Gunicorn, but useful for testing
-    socketio.run(app, host="0.0.0.0", port=8000, debug=False)
+    # For testing the WSGI app directly
+    from chiller import app
+    application.run(app, host="0.0.0.0", port=8000, debug=False)
