@@ -486,6 +486,12 @@ def background_cleanup_task():
     while True:
         cleanup_inactive_devices()
 
+
+@app.route("/health")
+def health_check():
+    return "OK", 200
+
+
 # -------------------- Main --------------------
 if __name__ == "__main__":
     print("="*80)
@@ -508,3 +514,4 @@ if __name__ == "__main__":
     # In production environments like Railway, we need to ensure the server is accessible
 
     socketio.run(app, host=HOST, port=PORT, debug=False, allow_unsafe_werkzeug=True)
+
