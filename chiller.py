@@ -261,14 +261,6 @@ def process_and_emit_frame(img_color, st, device_id, is_upload=False):
     """
     Core frame processing with emit throttling and optimizations.
     """
-    # Emit throttling - max 10 Hz per device
-    # --- only throttle the UI emit, not the compute ---
-    now = time.time()
-    if hasattr(st, "_last_emit_ts") and (now - st._last_emit_ts) < 0.10:
-     return
-st._last_emit_ts = now
-# --------------------------------------------------
-
     
     # Optional resize to max 480 on long side for performance
     h, w = img_color.shape[:2]
@@ -344,6 +336,12 @@ st._last_emit_ts = now
         if st.baseline_established:
             status = "monitoring"
             st.led_level = 0
+
+    # --- only throttle the UI emit, not the compute ---
+    now = time.time()
+    if hasattr(st, "_last_emit_ts") and (now - st._last_emit_ts) < 0.10:
+        return
+    st._last_emit_ts = now
     
     # === CREATE COLOR VISUALIZATION FOR DASHBOARD ===
     # Cap preview to max 480 and use JPEG quality 70 for faster encoding
