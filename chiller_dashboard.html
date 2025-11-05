@@ -6,920 +6,2006 @@
   <meta name="theme-color" content="#013D5A">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-  <meta name="description" content="Advanced goosebumps detection with real-time analytics">
-  <title>CHILLER - Advanced Goosebumps Detector</title>
-  
-  <!-- PWA Manifest -->
+  <meta name="description" content="A mobile app to detect goosebumps from video or camera">
+  <title>Goosebumps Detector</title>
   <link rel="manifest" href="/manifest.json">
   <link rel="icon" href="/icons/icon-192x192.png" type="image/png">
   <link rel="apple-touch-icon" href="/icons/icon-192x192.png">
-  
-  <!-- Modern Libraries -->
-  <script src="https://cdn.socket.io/4.7.4/socket.io.min.js"></script>
-  <script src="https://cdn.plot.ly/plotly-2.27.0.min.js"></script>
+  <link rel="apple-touch-icon" sizes="152x152" href="/icons/icon-152x152.png">
+  <link rel="apple-touch-icon" sizes="180x180" href="/icons/icon-192x192.png">
+  <!-- iOS PWA specific tags -->
+  <meta name="apple-mobile-web-app-title" content="CHILLER">
+  <link rel="apple-touch-startup-image" href="/icons/icon-512x512.png">
+  <script src="https://cdn.socket.io/4.5.4/socket.io.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns@3.0.0/dist/chartjs-adapter-date-fns.bundle.min.js"></script>
-  
-  <!-- Tailwind CSS for better responsive design -->
-  <script src="https://cdn.tailwindcss.com"></script>
-  
   <style>
+    /* Color palette based on the professional design */
     :root {
-      --primary: #013D5A;
-      --secondary: #FCF3E3;
-      --accent: #F4A258;
-      --success: #10B981;
-      --warning: #F59E0B;
-      --error: #EF4444;
-      --surface: rgba(255, 255, 255, 0.05);
-      --glass: rgba(255, 255, 255, 0.1);
+        --midnight: #013D5A; /* Primary dark blue */
+        --lionsmane: #FCF3E3; /* Light beige */
+        --celeste: #BDD3CE; /* Light blue */
+        --herb: #708C69; /* Muted green */
+        --marigold: #F4A258; /* Accent orange */
+        --text-dark: #333333;
+        --text-light: #FFFFFF;
+        --shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+        --transition: all 0.3s ease;
     }
     
-    * {
-      margin: 0;
-      padding: 0;
-      box-sizing: border-box;
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { 
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif; 
+      background: var(--midnight); /* Midnight color from the reference image */
+      color: #fff; 
+      min-height: 100vh; 
+      padding: 20px; 
+      overscroll-behavior-y: contain; 
     }
     
-    body {
-      font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
-      background: linear-gradient(135deg, var(--primary) 0%, #0A4B6B 100%);
+    /* Mobile-specific styles */
+    @media (max-width: 768px) {
+      body { padding: 10px; }
+      .header h1 { font-size: 1.8rem; }
+      .header p { font-size: 0.9rem; }
+      .panel { padding: 15px; }
+      .panel-title { font-size: 1.2rem; }
+      .btn { padding: 8px 14px; font-size: 0.9rem; }
+    }
+    
+    /* Offline notification and styles */
+    .offline-notification, .reconnect-notification {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      background-color: #F4A258;
+      color: #013D5A;
+      text-align: center;
+      padding: 10px;
+      font-weight: bold;
+      z-index: 1000;
+      display: none;
+      box-shadow: 0 2px 10px rgba(0, 0, 0, 0.2);
+      transition: all 0.3s ease;
+    }
+    
+    /* Styles for offline mode */
+    body.offline .camera-controls button:not(.btn-secondary),
+    body.offline #uploadBtn {
+      opacity: 0.6;
+      cursor: not-allowed;
+    }
+    
+    body.offline .video-container::after {
+      content: 'Camera unavailable in offline mode';
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      background: rgba(0, 0, 0, 0.7);
       color: white;
-      min-height: 100vh;
-      overflow-x: hidden;
+      padding: 10px 20px;
+      border-radius: 8px;
+      font-weight: bold;
     }
     
-    /* Glass morphism effects */
-    .glass {
-      background: var(--glass);
-      backdrop-filter: blur(20px);
+    /* Reconnect notification specific styles */
+    .reconnect-notification {
+      background-color: #4CAF50;
+      color: white;
+      bottom: 0;
+      top: auto;
+    }
+    
+    .reconnect-notification button {
+      background-color: white;
+      color: #4CAF50;
+      border: none;
+      padding: 5px 15px;
+      margin-left: 10px;
+      border-radius: 4px;
+      cursor: pointer;
+      font-weight: bold;
+      transition: background-color 0.3s;
+    }
+    
+    .reconnect-notification button:hover {
+      background-color: #f0f0f0;
+    }
+
+    .header { 
+      text-align: center; 
+      padding: 20px; 
+      margin-bottom: 20px; 
+      background: rgba(255, 255, 255, 0.05); 
+      backdrop-filter: blur(10px); 
+      border-radius: 15px; 
+      border: 1px solid rgba(255, 255, 255, 0.1); 
+      position: relative;
+    }
+    .header h1 { 
+      font-size: 2.5rem; 
+      font-weight: 700; 
+      margin-bottom: 10px; 
+      color: #FCF3E3; /* Lionsmane color from reference */
+    }
+    .header p { 
+      font-size: 1rem; 
+      opacity: 0.9; 
+      color: #BDD3CE; /* Celeste color from reference */
+    }
+    
+    /* Install button */
+    .install-button {
+      position: absolute;
+      top: 20px;
+      right: 20px;
+      background: #F4A258;
+      color: #013D5A;
+      border: none;
+      padding: 8px 16px;
+      border-radius: 8px;
+      font-weight: bold;
+      cursor: pointer;
+      display: none; /* Hidden by default, shown via JS when installation is possible */
+      transition: all 0.3s ease;
+    }
+    .install-button:hover {
+      background: #f8b77d;
+      transform: translateY(-2px);
+    }
+    
+    /* For mobile screens, position the install button below the header text */
+    @media (max-width: 768px) {
+      .install-button {
+        position: static;
+        margin-top: 15px;
+      }
+    }
+    
+    /* Mobile camera and upload controls */
+    .camera-controls { 
+      display: flex; 
+      flex-direction: column; 
+      gap: 15px; 
+      margin-bottom: 20px; 
+    }
+    .camera-row { 
+      display: flex; 
+      gap: 15px; 
+      justify-content: center; 
+      flex-wrap: wrap; 
+    }
+    
+    .video-container { 
+      position: relative; 
+      width: 100%; 
+      max-width: 640px; 
+      margin: 0 auto 20px; 
+      background: #000; 
+      border-radius: 15px; 
+      overflow: hidden; 
+      display: none; 
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3); 
       border: 1px solid rgba(255, 255, 255, 0.1);
-      border-radius: 16px;
+    }
+    .video-container.active { display: block; }
+    .video-container video { width: 100%; height: auto; display: block; }
+    
+    .camera-overlay { 
+      position: absolute; 
+      top: 0; 
+      left: 0; 
+      width: 100%; 
+      height: 100%; 
+      display: flex; 
+      flex-direction: column; 
+      justify-content: space-between; 
+      pointer-events: none; 
+    }
+    .camera-controls-top { 
+      display: flex; 
+      justify-content: space-between; 
+      padding: 10px; 
+    }
+    .camera-controls-bottom { padding: 10px; }
+    
+    .camera-btn { 
+      background: rgba(0,0,0,0.6); 
+      color: white; 
+      border: 1px solid rgba(255,255,255,0.2); 
+      border-radius: 50%; 
+      width: 50px; 
+      height: 50px; 
+      display: flex; 
+      align-items: center; 
+      justify-content: center; 
+      font-size: 1.5rem; 
+      cursor: pointer; 
+      pointer-events: auto; 
+      transition: all 0.2s ease;
+    }
+    .camera-btn:hover { 
+      background: rgba(0,0,0,0.8); 
+      transform: scale(1.05);
     }
     
-    .glass-strong {
-      background: rgba(255, 255, 255, 0.15);
-      backdrop-filter: blur(30px);
-      border: 1px solid rgba(255, 255, 255, 0.2);
-      border-radius: 20px;
+    .flashlight-toggle { 
+      position: absolute; 
+      top: 10px; 
+      right: 10px; 
+      background: rgba(0,0,0,0.6); 
+      color: white; 
+      border: 1px solid rgba(255,255,255,0.2); 
+      border-radius: 50%; 
+      width: 40px; 
+      height: 40px; 
+      display: flex; 
+      align-items: center; 
+      justify-content: center; 
+      font-size: 1.2rem; 
+      cursor: pointer; 
+      pointer-events: auto; 
+      transition: all 0.2s ease;
+    }
+    .flashlight-toggle:hover { 
+      background: rgba(0,0,0,0.8); 
+      transform: scale(1.05);
     }
     
-    /* Custom scrollbar */
-    ::-webkit-scrollbar {
-      width: 8px;
+    .file-upload { display: none; }
+    .upload-label { 
+      display: inline-flex; 
+      align-items: center; 
+      justify-content: center; 
+      gap: 8px; 
+      background: #708C69; /* Herb color from reference */
+      color: white; 
+      padding: 12px 20px; 
+      border-radius: 10px; 
+      cursor: pointer; 
+      font-weight: 600; 
+      border: none; 
+      box-shadow: 0 4px 10px rgba(0,0,0,0.2); 
+      transition: all 0.2s ease;
+    }
+    .upload-label:hover { 
+      background: #5A7254; 
+      transform: translateY(-2px);
     }
     
-    ::-webkit-scrollbar-track {
-      background: rgba(255, 255, 255, 0.1);
+    .live-graph { 
+      width: 100%; 
+      height: 180px; 
+      background: rgba(0,0,0,0.2); 
+      border-radius: 10px; 
+      margin-top: 10px; 
+      padding: 15px; 
+      display: none; 
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      box-shadow: 0 5px 15px rgba(0, 0, 0, 0.2);
+    }
+    .live-graph.active { display: block; }
+
+    .device-selector { 
+      text-align: center; 
+      margin-bottom: 20px; 
+    }
+    .device-selector select { 
+      background: rgba(255, 255, 255, 0.1); 
+      border: 1px solid rgba(255, 255, 255, 0.2); 
+      color: #fff; 
+      padding: 12px 20px; 
+      border-radius: 10px; 
+      font-size: 1.1rem; 
+      font-weight: 600; 
+      cursor: pointer; 
+      min-width: 280px; 
+      box-shadow: 0 4px 10px rgba(0,0,0,0.2);
+    }
+    .device-selector select option { 
+      background: #013D5A; 
+      color: #fff; 
+    }
+
+    .main-grid { 
+      display: grid; 
+      grid-template-columns: 1fr; 
+      gap: 20px; 
+      max-width: 1600px; 
+      margin: 0 auto; 
+    }
+    .panel { 
+      background: rgba(255, 255, 255, 0.05); 
+      backdrop-filter: blur(10px); 
+      border-radius: 15px; 
+      padding: 20px; 
+      border: 1px solid rgba(255, 255, 255, 0.1); 
+      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2); 
+    }
+    .panel-title { 
+      font-size: 1.5rem; 
+      font-weight: 700; 
+      margin-bottom: 15px; 
+      display: flex; 
+      align-items: center; 
+      gap: 10px; 
+      color: #FCF3E3; /* Lionsmane color */
+    }
+
+    /* Cards grid */
+    .cards-grid { 
+      display: grid; 
+      gap: 16px; 
+    }
+    @media (min-width: 640px){ .cards-grid { grid-template-columns: repeat(2, 1fr); } }
+    @media (min-width: 1024px){ .cards-grid { grid-template-columns: repeat(3, 1fr); } }
+    @media (min-width: 1400px){ .cards-grid { grid-template-columns: repeat(4, 1fr); } }
+
+    .device-card { 
+      position: relative; 
+      background: rgba(0,0,0,0.2); 
+      border: 1px solid rgba(255,255,255,0.1); 
+      border-radius: 14px; 
+      overflow: hidden; 
+      display: flex; 
+      flex-direction: column; 
+      min-height: 420px; 
+      box-shadow: 0 5px 15px rgba(0, 0, 0, 0.2);
+    }
+    .device-card__header { 
+      display: flex; 
+      align-items: center; 
+      justify-content: space-between; 
+      padding: 12px 15px; 
+      background: rgba(0,0,0,0.3); 
+      border-bottom: 1px solid rgba(255,255,255,0.1); 
+    }
+    .device-card__title-container { 
+      display: flex; 
+      align-items: center; 
+      gap: 8px; 
+    }
+    .device-card__title { 
+      font-weight: 800; 
+      letter-spacing: 0.3px; 
+    }
+    .status-indicator { 
+      width: 10px; 
+      height: 10px; 
+      border-radius: 50%; 
+      transition: background-color 0.3s ease; 
+    }
+    .status-indicator.active { 
+      background-color: #4CAF50; /* Green for active */ 
+      box-shadow: 0 0 5px rgba(76, 175, 80, 0.5); 
+    }
+    .status-indicator.inactive { 
+      background-color: #F44336; /* Red for inactive */ 
+      box-shadow: 0 0 5px rgba(244, 67, 54, 0.5); 
+    }
+    .device-card__actions { 
+      display: flex; 
+      gap: 8px; 
+    }
+    .sm-btn { 
+      padding: 6px 12px; 
+      border-radius: 8px; 
+      border: 1px solid rgba(255,255,255,0.15); 
+      background: rgba(255,255,255,0.1); 
+      color: #fff; 
+      font-weight: 700; 
+      cursor: pointer; 
+      transition: all 0.2s ease;
+    }
+    .sm-btn:hover { 
+      background: rgba(255,255,255,0.15); 
+    }
+
+    .device-card__feed { 
+      position: relative; 
+      background: #000; 
+      height: 180px; 
+    }
+    .device-card__feed img { 
+      width: 100%; 
+      height: 100%; 
+      object-fit: cover; 
+      display: block; 
+    }
+    .feed-overlay { 
+      position: absolute; 
+      top: 8px; 
+      left: 8px; 
+      padding: 6px 12px; 
+      border-radius: 999px; 
+      font-size: 0.8rem; 
+      font-weight: 700; 
+      border: 1px solid rgba(255,255,255,0.15); 
+    }
+    
+    .frame-counter {
+      position: absolute;
+      bottom: 10px;
+      right: 10px;
+      background-color: rgba(0, 0, 0, 0.6);
+      padding: 3px 8px;
       border-radius: 4px;
+      font-size: 12px;
+      font-weight: 500;
+      color: #fff;
+    }
+    .baseline { 
+      background: linear-gradient(90deg, #F4A258, #E07A5F); /* Marigold color */
+    }
+    .monitor { 
+      background: rgba(255,255,255,0.15); 
+    }
+    .detect { 
+      background: linear-gradient(90deg, #708C69, #5A7254); /* Herb color */
+    }
+
+    .device-card__stats { 
+      display: grid; 
+      grid-template-columns: repeat(4, 1fr); 
+      gap: 8px; 
+      padding: 12px; 
+    }
+    .stat { 
+      background: rgba(0,0,0,0.2); 
+      border: 1px solid rgba(255,255,255,0.1); 
+      border-radius: 10px; 
+      text-align: center; 
+      padding: 10px; 
+    }
+    .stat .label { 
+      font-size: 0.75rem; 
+      opacity: 0.8; 
+      text-transform: uppercase; 
+      letter-spacing: 1px; 
+      color: #BDD3CE; /* Celeste color */
+    }
+    .stat .val { 
+      font-size: 1.1rem; 
+      font-weight: 900; 
+      color: #FCF3E3; /* Lionsmane color */
+    }
+
+    .device-card__chart { 
+      position: relative; 
+      height: 170px; 
+      padding: 10px; 
+    }
+
+    /* When filtering a single device, we make the card span full width */
+    .single-only .device-card { grid-column: 1 / -1; }
+
+    /* Top controls */
+    .controls { 
+      display: flex; 
+      gap: 15px; 
+      justify-content: center; 
+      flex-wrap: wrap;
+    }
+    .btn { 
+      padding: 12px 20px; 
+      border: none; 
+      border-radius: 10px; 
+      font-weight: 800; 
+      cursor: pointer; 
+      box-shadow: 0 4px 14px rgba(0,0,0,0.3); 
+      transition: all 0.2s ease;
+    }
+    .btn:hover { 
+      transform: translateY(-2px); 
+      box-shadow: 0 6px 18px rgba(0,0,0,0.4); 
+    }
+    .btn-primary { 
+      background: #BDD3CE; /* Celeste color */
+      color: #013D5A; /* Midnight color */
+    }
+    .btn-secondary { 
+      background: rgba(255, 255, 255, 0.1); 
+      color: #fff; 
+      border: 1px solid rgba(255, 255, 255, 0.2); 
     }
     
-    ::-webkit-scrollbar-thumb {
-      background: var(--accent);
+    /* PWA install prompt */
+    .install-prompt { 
+      display: none; 
+      position: fixed; 
+      bottom: 20px; 
+      left: 50%; 
+      transform: translateX(-50%); 
+      background: rgba(0,0,0,0.8); 
+      color: white; 
+      padding: 15px 20px; 
+      border-radius: 10px; 
+      z-index: 1000; 
+      text-align: center; 
+      max-width: 90%; 
+      box-shadow: 0 10px 30px rgba(0,0,0,0.4);
+    }
+    .install-prompt.show { 
+      display: block; 
+      animation: slideUp 0.3s ease-out; 
+    }
+    .install-actions { 
+      display: flex; 
+      gap: 10px; 
+      margin-top: 10px; 
+      justify-content: center; 
+    }
+    .install-btn { 
+      background: #708C69; /* Herb color */
+      color: white; 
+      border: none; 
+      padding: 8px 16px; 
+      border-radius: 6px; 
+      font-weight: 600; 
+      cursor: pointer; 
+      transition: all 0.2s ease;
+    }
+    .install-btn:hover { 
+      background: #5A7254; 
+    }
+    .install-dismiss { 
+      background: transparent; 
+      color: white; 
+      border: 1px solid rgba(255,255,255,0.2); 
+      padding: 8px 16px; 
+      border-radius: 6px; 
+      cursor: pointer; 
+      transition: all 0.2s ease;
+    }
+    .install-dismiss:hover { 
+      background: rgba(255,255,255,0.1); 
+    }
+    
+    @keyframes slideUp {
+      from { transform: translate(-50%, 100%); opacity: 0; }
+      to { transform: translate(-50%, 0); opacity: 1; }
+    }
+    
+    .video-overlay {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      pointer-events: none;
+      transition: background-color 0.3s ease;
+    }
+    
+    .video-overlay.detection-active {
+      background-color: rgba(255, 87, 51, 0.2);
+    }
+    
+    .camera-info {
+      position: absolute;
+      top: 10px;
+      left: 10px;
+      background-color: rgba(0, 0, 0, 0.6);
+      color: white;
+      padding: 5px 10px;
       border-radius: 4px;
+      font-size: 12px;
+      font-weight: 500;
+      z-index: 10;
     }
     
-    /* Animations */
-    @keyframes fadeInUp {
-      from {
-        opacity: 0;
-        transform: translateY(30px);
-      }
-      to {
-        opacity: 1;
-        transform: translateY(0);
-      }
+    .frame-info {
+      position: absolute;
+      top: 40px;
+      left: 10px;
+      background-color: rgba(0, 0, 0, 0.6);
+      color: white;
+      padding: 3px 8px;
+      border-radius: 4px;
+      font-size: 12px;
+      font-weight: 500;
+      z-index: 10;
+    }
+    
+    .detection-info {
+      position: absolute;
+      bottom: 10px;
+      left: 10px;
+      background-color: rgba(255, 87, 51, 0.8);
+      color: white;
+      padding: 5px 10px;
+      border-radius: 4px;
+      font-size: 14px;
+      font-weight: 600;
+      animation: pulse 1s infinite;
+      z-index: 10;
     }
     
     @keyframes pulse {
-      0%, 100% { opacity: 1; }
-      50% { opacity: 0.7; }
+      0% { opacity: 0.8; }
+      50% { opacity: 1; }
+      100% { opacity: 0.8; }
     }
     
-    @keyframes glow {
-      0%, 100% { box-shadow: 0 0 20px rgba(244, 162, 88, 0.3); }
-      50% { box-shadow: 0 0 30px rgba(244, 162, 88, 0.6); }
-    }
-    
-    .animate-fade-in {
-      animation: fadeInUp 0.6s ease-out;
-    }
-    
-    .animate-pulse {
-      animation: pulse 2s infinite;
-    }
-    
-    .animate-glow {
-      animation: glow 2s infinite;
-    }
-    
-    /* Button styles */
-    .btn {
-      @apply px-6 py-3 rounded-xl font-semibold transition-all duration-300 transform hover:scale-105 active:scale-95;
-      box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
-    }
-    
-    .btn-primary {
-      background: linear-gradient(135deg, var(--accent) 0%, #E07A5F 100%);
-      color: white;
-    }
-    
-    .btn-primary:hover {
-      box-shadow: 0 8px 25px rgba(244, 162, 88, 0.4);
-    }
-    
-    .btn-secondary {
-      background: var(--glass);
-      backdrop-filter: blur(10px);
-      border: 1px solid rgba(255, 255, 255, 0.2);
-      color: white;
-    }
-    
-    .btn-success {
-      background: linear-gradient(135deg, var(--success) 0%, #059669 100%);
-      color: white;
-    }
-    
-    /* Card styles */
-    .card {
-      @apply glass p-6 transition-all duration-300 hover:shadow-2xl;
-    }
-    
-    .card:hover {
-      transform: translateY(-5px);
-      box-shadow: 0 20px 40px rgba(0, 0, 0, 0.3);
-    }
-    
-    /* Status indicators */
-    .status-dot {
-      @apply w-3 h-3 rounded-full;
-    }
-    
-    .status-active {
-      background: var(--success);
-      box-shadow: 0 0 10px rgba(16, 185, 129, 0.5);
-    }
-    
-    .status-inactive {
-      background: var(--error);
-      box-shadow: 0 0 10px rgba(239, 68, 68, 0.5);
-    }
-    
-    .status-baseline {
-      background: var(--warning);
-      box-shadow: 0 0 10px rgba(245, 158, 11, 0.5);
-    }
-    
-    /* Video container improvements */
-    .video-container {
-      @apply relative rounded-2xl overflow-hidden glass-strong;
-      aspect-ratio: 16/9;
-      max-width: 800px;
-    }
-    
-    .video-container video {
-      @apply w-full h-full object-cover;
-    }
-    
-    /* Chart container */
-    .chart-container {
-      @apply glass p-4 rounded-2xl;
-      min-height: 300px;
-    }
-    
-    /* Mobile optimizations */
-    @media (max-width: 768px) {
-      .video-container {
-        aspect-ratio: 4/3;
-      }
-      
-      .btn {
-        @apply px-4 py-2 text-sm;
-      }
-      
-      .card {
-        @apply p-4;
-      }
-    }
-    
-    /* Loading states */
-    .loading {
-      @apply animate-pulse;
-    }
-    
-    .skeleton {
-      background: linear-gradient(90deg, rgba(255,255,255,0.1) 25%, rgba(255,255,255,0.2) 50%, rgba(255,255,255,0.1) 75%);
-      background-size: 200% 100%;
-      animation: loading 1.5s infinite;
-    }
-    
-    @keyframes loading {
-      0% { background-position: 200% 0; }
-      100% { background-position: -200% 0; }
-    }
-    
-    /* Performance indicators */
-    .perf-indicator {
-      @apply absolute top-2 right-2 px-2 py-1 text-xs rounded-lg;
-      background: rgba(0, 0, 0, 0.7);
-      font-family: 'Monaco', 'Menlo', monospace;
-    }
-    
-    /* Detection overlay */
-    .detection-overlay {
-      @apply absolute inset-0 flex items-center justify-center;
+    .https-warning {
       background: rgba(244, 162, 88, 0.2);
-      backdrop-filter: blur(2px);
+      border: 1px solid #F4A258;
+      border-radius: 8px;
+      padding: 10px;
+      margin-top: 15px;
+      text-align: center;
+      font-size: 0.9rem;
     }
     
-    .detection-badge {
-      @apply px-4 py-2 rounded-full font-bold text-white animate-glow;
-      background: linear-gradient(135deg, var(--accent) 0%, #E07A5F 100%);
+    .https-warning p {
+      margin: 5px 0;
+      color: #F4A258;
     }
   </style>
 </head>
-
-<body class="bg-gradient-to-br from-blue-900 to-blue-800">
-  <!-- Header -->
-  <header class="glass-strong mx-4 mt-4 p-6 animate-fade-in">
-    <div class="flex flex-col md:flex-row items-center justify-between">
-      <div class="text-center md:text-left mb-4 md:mb-0">
-        <h1 class="text-3xl md:text-4xl font-bold bg-gradient-to-r from-orange-400 to-orange-600 bg-clip-text text-transparent">
-          ❄️ CHILLER Pro
-        </h1>
-        <p class="text-blue-200 mt-2">Advanced Goosebumps Detection & Analytics</p>
-      </div>
-      
-      <div class="flex items-center space-x-4">
-        <div id="connectionStatus" class="flex items-center space-x-2">
-          <div class="status-dot status-active"></div>
-          <span class="text-sm">Connected</span>
-        </div>
-        <button id="installBtn" class="btn btn-primary hidden">
-          📱 Install App
-        </button>
+<body>
+  <div id="offlineNotification" class="offline-notification">You are currently offline. Some features may be limited.</div>
+  
+  <div class="header">
+    <h1>❄️ Goosebumps Detector</h1>
+    <p>Real-time detection and analysis dashboard</p>
+    <button id="installButton" class="install-button">Install App</button>
+    <div id="httpsWarning" class="https-warning" style="display: none;">
+      <p>⚠️ For full functionality (PWA + Camera), use HTTPS or localhost</p>
+      <p>Current: <span id="currentProtocol"></span></p>
+    </div>
+  </div>
+  
+  <div class="camera-controls">
+    <div class="camera-row">
+      <button class="btn btn-primary" id="cameraBtn"><span class="btn-icon">📷</span> Detect from Camera</button>
+      <label class="upload-label">
+        <span class="btn-icon">📤</span> Upload Video
+        <input type="file" class="file-upload" id="videoUpload" accept="video/*">
+      </label>
+    </div>
+  </div>
+  
+  <div class="video-container" id="videoContainer">
+    <video id="videoElement" autoplay playsinline></video>
+    <div id="videoOverlay" class="video-overlay"></div>
+    <div class="camera-overlay">
+      <div class="camera-controls-top">
+        <button class="camera-btn" id="closeVideoBtn">✕</button>
+        <button class="flashlight-toggle" id="flashlightBtn">💡</button>
       </div>
     </div>
-  </header>
+  </div>
+  
+  <div class="live-graph" id="liveGraphContainer">
+    <canvas id="liveGraph"></canvas>
+  </div>
 
-  <!-- Main Content -->
-  <main class="container mx-auto px-4 py-6 space-y-6">
-    
-    <!-- Camera Controls -->
-    <section class="glass p-6 animate-fade-in">
-      <h2 class="text-xl font-semibold mb-4 flex items-center">
-        <span class="mr-2">📹</span> Camera & Upload
-      </h2>
-      
-      <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <button id="cameraBtn" class="btn btn-primary w-full">
-          <span class="mr-2">📷</span> Start Camera Detection
-        </button>
-        
-        <label class="btn btn-secondary w-full cursor-pointer">
-          <span class="mr-2">📤</span> Upload Video
-          <input type="file" id="videoUpload" accept="video/*" class="hidden">
-        </label>
-      </div>
-    </section>
+  <div class="device-selector">
+    <select id="deviceSelect">
+      <option value="__all__">All active devices</option>
+    </select>
+  </div>
 
-    <!-- Video Display -->
-    <section id="videoSection" class="hidden animate-fade-in">
-      <div class="video-container mx-auto">
-        <video id="videoElement" autoplay playsinline muted></video>
-        
-        <!-- Video Overlay -->
-        <div id="videoOverlay" class="absolute inset-0">
-          <!-- Performance Info -->
-          <div class="perf-indicator">
-            <div id="fpsCounter">FPS: --</div>
-            <div id="frameCounter">Frame: --</div>
-          </div>
-          
-          <!-- Controls -->
-          <div class="absolute top-4 left-4 flex space-x-2">
-            <button id="closeVideoBtn" class="btn btn-secondary !p-2">✕</button>
-            <button id="flashlightBtn" class="btn btn-secondary !p-2">💡</button>
-          </div>
-          
-          <!-- Detection Status -->
-          <div id="detectionStatus" class="absolute bottom-4 left-4 px-3 py-2 rounded-lg bg-black bg-opacity-50">
-            <span class="text-sm">Initializing...</span>
-          </div>
-        </div>
-      </div>
-    </section>
+  <div class="main-grid">
+    <div class="panel">
+      <div class="panel-title">📹 Live Feeds & Stats</div>
+      <div id="cardsGrid" class="cards-grid"></div>
+    </div>
 
-    <!-- Real-time Analytics -->
-    <section class="grid grid-cols-1 lg:grid-cols-2 gap-6">
-      
-      <!-- Live Chart -->
-      <div class="card">
-        <h3 class="text-lg font-semibold mb-4 flex items-center">
-          <span class="mr-2">📊</span> Real-time Intensity
-        </h3>
-        <div class="chart-container">
-          <div id="liveChart" style="width:100%;height:300px;"></div>
-        </div>
+    <div class="panel">
+      <div class="panel-title">⚙️ Controls</div>
+      <div class="controls">
+        <button class="btn btn-primary" id="resetBaseline">🔄 Reset Baseline (selected / all)</button>
+        <button class="btn btn-secondary" id="exportData">💾 Export Detections (selected / all)</button>
       </div>
-      
-      <!-- Statistics -->
-      <div class="card">
-        <h3 class="text-lg font-semibold mb-4 flex items-center">
-          <span class="mr-2">📈</span> Statistics
-        </h3>
-        <div class="grid grid-cols-2 gap-4">
-          <div class="glass p-4 rounded-xl text-center">
-            <div class="text-2xl font-bold text-orange-400" id="totalDetections">0</div>
-            <div class="text-sm text-blue-200">Total Detections</div>
-          </div>
-          <div class="glass p-4 rounded-xl text-center">
-            <div class="text-2xl font-bold text-green-400" id="maxIntensity">0%</div>
-            <div class="text-sm text-blue-200">Max Intensity</div>
-          </div>
-          <div class="glass p-4 rounded-xl text-center">
-            <div class="text-2xl font-bold text-blue-400" id="avgIntensity">0%</div>
-            <div class="text-sm text-blue-200">Avg Intensity</div>
-          </div>
-          <div class="glass p-4 rounded-xl text-center">
-            <div class="text-2xl font-bold text-purple-400" id="activeDevices">0</div>
-            <div class="text-sm text-blue-200">Active Devices</div>
-          </div>
-        </div>
-      </div>
-    </section>
-
-    <!-- Device Management -->
-    <section class="card">
-      <div class="flex flex-col md:flex-row items-start md:items-center justify-between mb-6">
-        <h3 class="text-lg font-semibold flex items-center mb-4 md:mb-0">
-          <span class="mr-2">🔧</span> Device Management
-        </h3>
-        
-        <div class="flex flex-col md:flex-row space-y-2 md:space-y-0 md:space-x-4">
-          <select id="deviceSelect" class="glass px-4 py-2 rounded-lg border-0 text-white">
-            <option value="__all__">All Devices</option>
-          </select>
-          
-          <div class="flex space-x-2">
-            <button id="resetBtn" class="btn btn-secondary">🔄 Reset</button>
-            <button id="exportBtn" class="btn btn-success">💾 Export</button>
-          </div>
-        </div>
-      </div>
-      
-      <!-- Device Grid -->
-      <div id="deviceGrid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-        <!-- Device cards will be inserted here -->
-      </div>
-    </section>
-
-  </main>
-
-  <!-- Loading Overlay -->
-  <div id="loadingOverlay" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 hidden">
-    <div class="glass p-8 rounded-2xl text-center">
-      <div class="animate-spin w-12 h-12 border-4 border-orange-400 border-t-transparent rounded-full mx-auto mb-4"></div>
-      <p class="text-lg">Processing...</p>
     </div>
   </div>
 
-  <!-- Notification Toast -->
-  <div id="toast" class="fixed top-4 right-4 glass p-4 rounded-xl transform translate-x-full transition-transform duration-300 z-50">
-    <div id="toastMessage" class="text-sm"></div>
+  <!-- Install prompt for PWA -->
+  <div class="install-prompt" id="installPrompt">
+    <div>Install this app on your device for better experience</div>
+    <div class="install-actions">
+      <button class="install-btn" id="installBtn">Install</button>
+      <button class="install-dismiss" id="dismissInstallBtn">Not now</button>
+    </div>
   </div>
 
   <script>
-    // Enhanced Application State Management
-    class ChillerApp {
-      constructor() {
-        this.socket = io();
-        this.devices = new Map();
-        this.currentStream = null;
-        this.isProcessing = false;
-        this.stats = {
-          totalDetections: 0,
-          maxIntensity: 0,
-          avgIntensity: 0,
-          activeDevices: 0
-        };
-        
-        // Performance tracking
-        this.performance = {
-          fps: 0,
-          frameCount: 0,
-          lastFrameTime: 0,
-          processingTimes: []
-        };
-        
-        // Initialize Plotly chart
-        this.initializeLiveChart();
-        this.setupEventListeners();
-        this.setupSocketHandlers();
-        this.checkDeviceCapabilities();
+    // Check protocol and show warning if needed
+    (function checkProtocol() {
+      const isSecure = window.isSecureContext;
+      const protocol = window.location.protocol;
+      const hostname = window.location.hostname;
+      
+      const httpsWarning = document.getElementById('httpsWarning');
+      const currentProtocol = document.getElementById('currentProtocol');
+      
+      if (currentProtocol) {
+        currentProtocol.textContent = `${protocol}//${hostname}`;
       }
       
-      // Initialize advanced Plotly chart
-      initializeLiveChart() {
-        const layout = {
-          title: {
-            text: 'Goosebump Intensity Over Time',
-            font: { color: 'white', size: 16 }
-          },
-          xaxis: {
-            title: 'Time',
-            color: 'white',
-            gridcolor: 'rgba(255,255,255,0.1)',
-            type: 'date'
-          },
-          yaxis: {
-            title: 'Intensity (%)',
-            color: 'white',
-            gridcolor: 'rgba(255,255,255,0.1)',
-            range: [-10, 100]
-          },
-          plot_bgcolor: 'rgba(0,0,0,0)',
-          paper_bgcolor: 'rgba(0,0,0,0)',
-          font: { color: 'white' },
-          margin: { t: 50, r: 20, b: 50, l: 60 }
-        };
-        
-        const config = {
-          responsive: true,
-          displayModeBar: false
-        };
-        
-        this.chartData = [{
-          x: [],
-          y: [],
-          type: 'scatter',
-          mode: 'lines+markers',
-          line: {
-            color: '#F4A258',
-            width: 3,
-            shape: 'spline'
-          },
-          marker: {
-            color: '#F4A258',
-            size: 6
-          },
-          name: 'Intensity'
-        }];
-        
-        Plotly.newPlot('liveChart', this.chartData, layout, config);
-      }
+      // Railway provides HTTPS automatically, so check for Railway or other secure contexts
+      const isRailway = hostname.includes('railway.app') || hostname.includes('up.railway.app');
+      const isLocalhost = hostname === 'localhost' || hostname === '127.0.0.1';
       
-      // Setup event listeners
-      setupEventListeners() {
-        // Camera controls
-        document.getElementById('cameraBtn').addEventListener('click', () => this.toggleCamera());
-        document.getElementById('videoUpload').addEventListener('change', (e) => this.handleVideoUpload(e));
-        document.getElementById('closeVideoBtn').addEventListener('click', () => this.stopCamera());
-        document.getElementById('flashlightBtn').addEventListener('click', () => this.toggleFlashlight());
-        
-        // Device management
-        document.getElementById('deviceSelect').addEventListener('change', (e) => this.filterDevices(e.target.value));
-        document.getElementById('resetBtn').addEventListener('click', () => this.resetBaseline());
-        document.getElementById('exportBtn').addEventListener('click', () => this.exportData());
-        
-        // PWA install
-        document.getElementById('installBtn').addEventListener('click', () => this.installPWA());
-        
-        // Handle PWA install prompt
-        window.addEventListener('beforeinstallprompt', (e) => {
-          e.preventDefault();
-          this.deferredPrompt = e;
-          document.getElementById('installBtn').classList.remove('hidden');
-        });
-      }
-      
-      // Setup Socket.IO handlers
-      setupSocketHandlers() {
-        this.socket.on('connect', () => {
-          this.updateConnectionStatus(true);
-          this.showToast('Connected to server', 'success');
-        });
-        
-        this.socket.on('disconnect', () => {
-          this.updateConnectionStatus(false);
-          this.showToast('Disconnected from server', 'error');
-        });
-        
-        this.socket.on('frame', (data) => this.handleFrameData(data));
-        this.socket.on('devices', (data) => this.updateDeviceList(data.devices || []));
-      }
-      
-      // Check device capabilities
-      async checkDeviceCapabilities() {
-        // Check for camera support
-        if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-          this.showToast('Camera not supported on this device', 'warning');
-          document.getElementById('cameraBtn').disabled = true;
+      // Show warning if not secure and not localhost and not Railway
+      if (!isSecure && !isLocalhost && !isRailway) {
+        if (httpsWarning) {
+          httpsWarning.style.display = 'block';
         }
-        
-        // Check for secure context
-        if (!window.isSecureContext) {
-          this.showToast('Some features require HTTPS', 'warning');
+        console.warn('⚠️ Not running in secure context. PWA and Camera features limited.');
+      } else {
+        console.log('✅ Running in secure context:', { isSecure, isLocalhost, isRailway, hostname });
+        // Hide warning if it was shown
+        if (httpsWarning) {
+          httpsWarning.style.display = 'none';
         }
-        
-        // Load initial device list
+      }
+    })();
+    
+    // PWA and Service Worker Setup
+    let deferredPrompt = null;
+    let isOnline = navigator.onLine;
+    
+    // Register service worker for PWA
+    if ('serviceWorker' in navigator) {
+      console.log('Service Worker supported');
+      
+      window.addEventListener('load', async () => {
         try {
-          const response = await fetch('/devices');
-          const data = await response.json();
-          this.updateDeviceList(data.devices || []);
-        } catch (error) {
-          console.error('Failed to load devices:', error);
-        }
-      }
-      
-      // Camera management
-      async toggleCamera() {
-        if (this.currentStream) {
-          this.stopCamera();
-          return;
-        }
-        
-        try {
-          this.showLoading(true);
-          
-          const constraints = {
-            video: {
-              facingMode: 'environment',
-              width: { ideal: 1280, max: 1920 },
-              height: { ideal: 720, max: 1080 },
-              frameRate: { ideal: 30, max: 60 }
-            }
-          };
-          
-          this.currentStream = await navigator.mediaDevices.getUserMedia(constraints);
-          const videoElement = document.getElementById('videoElement');
-          videoElement.srcObject = this.currentStream;
-          
-          document.getElementById('videoSection').classList.remove('hidden');
-          document.getElementById('cameraBtn').textContent = '⏹️ Stop Camera';
-          
-          // Start processing frames
-          videoElement.addEventListener('loadedmetadata', () => {
-            this.startFrameProcessing();
-            this.showLoading(false);
+          const registration = await navigator.serviceWorker.register('/service-worker.js', {
+            scope: '/'
           });
+          console.log('✅ ServiceWorker registration successful:', registration.scope);
           
+          // Update service worker when new version is available
+          registration.addEventListener('updatefound', () => {
+            console.log('New service worker found');
+            const newWorker = registration.installing;
+            newWorker.addEventListener('statechange', () => {
+              if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
+                console.log('New service worker installed');
+                if (confirm('New version available! Refresh to update?')) {
+                  window.location.reload();
+                }
+              }
+            });
+          });
         } catch (error) {
-          console.error('Camera error:', error);
-          this.showToast(`Camera error: ${error.message}`, 'error');
-          this.showLoading(false);
+          console.error('❌ ServiceWorker registration failed:', error);
         }
+      });
+      
+      // PWA Installation handling
+      const installButton = document.getElementById('installButton');
+      
+      // Check if app is already installed
+      function checkIfInstalled() {
+        // Check if running in standalone mode (installed PWA)
+        if (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches) {
+          console.log('✅ App is running in standalone mode (installed)');
+          if (installButton) installButton.style.display = 'none';
+          return true;
+        }
+        
+        // Check if running as PWA on iOS
+        if (window.navigator.standalone === true) {
+          console.log('✅ App is running as PWA on iOS');
+          if (installButton) installButton.style.display = 'none';
+          return true;
+        }
+        
+        return false;
       }
       
-      stopCamera() {
-        if (this.currentStream) {
-          this.currentStream.getTracks().forEach(track => track.stop());
-          this.currentStream = null;
-        }
-        
-        const videoElement = document.getElementById('videoElement');
-        videoElement.srcObject = null;
-        
-        document.getElementById('videoSection').classList.add('hidden');
-        document.getElementById('cameraBtn').textContent = '📷 Start Camera Detection';
-        
-        this.isProcessing = false;
+      // Show install button initially for mobile devices
+      if (installButton && !checkIfInstalled()) {
+        console.log('📱 Showing install button for mobile device');
+        installButton.style.display = 'block';
       }
       
-      // Advanced frame processing with performance optimization
-      startFrameProcessing() {
-        const videoElement = document.getElementById('videoElement');
-        const canvas = document.createElement('canvas');
-        const ctx = canvas.getContext('2d', { alpha: false });
-        
-        let frameInterval = 200; // Start with 200ms (5fps)
-        const deviceId = `camera-${Date.now()}`;
-        
-        const processFrame = async () => {
-          if (!this.currentStream || this.isProcessing) return;
+      // Listen for the beforeinstallprompt event
+      window.addEventListener('beforeinstallprompt', (e) => {
+        console.log('🎯 beforeinstallprompt event fired');
+        // Prevent Chrome 67 and earlier from automatically showing the prompt
+        e.preventDefault();
+        // Stash the event so it can be triggered later
+        deferredPrompt = e;
+        // Show the install button
+        if (installButton) {
+          installButton.style.display = 'block';
+          console.log('✅ Install button shown');
+        }
+      });
+      
+      // Handle install button click
+      if (installButton) {
+        installButton.addEventListener('click', async () => {
+          console.log('🔘 Install button clicked');
           
-          this.isProcessing = true;
-          const startTime = performance.now();
+          if (!deferredPrompt) {
+            console.log('⚠️ No deferred prompt available, showing manual instructions');
+            // Fallback for browsers without beforeinstallprompt
+            if (/iPhone|iPad|iPod/.test(navigator.userAgent)) {
+              alert('To install this app on iOS:\n\n1. Tap the Share button (□↑) at the bottom\n2. Scroll down and tap "Add to Home Screen"\n3. Tap "Add" to confirm');
+            } else if (/Android/.test(navigator.userAgent)) {
+              alert('To install this app on Android:\n\n1. Tap the menu (⋮) in your browser\n2. Tap "Add to Home screen" or "Install app"\n3. Follow the prompts');
+            } else {
+              alert('To install this app:\n\n1. Look for "Install" in your browser menu\n2. Or bookmark this page for easy access');
+            }
+            return;
+          }
           
           try {
-            // Update canvas size to match video
-            canvas.width = videoElement.videoWidth;
-            canvas.height = videoElement.videoHeight;
+            console.log('📲 Showing install prompt');
+            // Show the install prompt
+            await deferredPrompt.prompt();
             
-            // Draw frame
-            ctx.drawImage(videoElement, 0, 0);
+            // Wait for the user to respond to the prompt
+            const { outcome } = await deferredPrompt.userChoice;
+            console.log(`👤 User response: ${outcome}`);
             
-            // Convert to blob with optimized quality
-            const blob = await new Promise(resolve => {
-              canvas.toBlob(resolve, 'image/jpeg', 0.8);
-            });
-            
-            // Convert to base64
-            const base64 = await this.blobToBase64(blob);
-            
-            // Send to server
-            const response = await fetch('/upload_frame', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({
-                device_id: deviceId,
-                jpg_b64: base64.split(',')[1],
-                frame_number: this.performance.frameCount++
-              })
-            });
-            
-            const data = await response.json();
-            
-            // Update performance metrics
-            const processingTime = performance.now() - startTime;
-            this.updatePerformanceMetrics(processingTime);
-            
-            // Adjust frame rate based on performance
-            this.adjustFrameRate(processingTime, frameInterval);
-            
-          } catch (error) {
-            console.error('Frame processing error:', error);
-          } finally {
-            this.isProcessing = false;
-            
-            // Schedule next frame
-            if (this.currentStream) {
-              setTimeout(processFrame, frameInterval);
+            if (outcome === 'accepted') {
+              console.log('✅ User accepted the install prompt');
+            } else {
+              console.log('❌ User dismissed the install prompt');
             }
+            
+            // Clear the prompt
+            deferredPrompt = null;
+            installButton.style.display = 'none';
+          } catch (error) {
+            console.error('❌ Error during installation:', error);
           }
-        };
-        
-        // Start processing
-        processFrame();
-      }
-      
-      // Handle incoming frame data
-      handleFrameData(data) {
-        // Update live chart
-        this.updateLiveChart(data);
-        
-        // Update device card
-        this.updateDeviceCard(data);
-        
-        // Update statistics
-        this.updateStatistics(data);
-        
-        // Update detection status
-        this.updateDetectionStatus(data);
-      }
-      
-      // Update live chart with new data
-      updateLiveChart(data) {
-        if (!data.baseline_established) return;
-        
-        const now = new Date();
-        this.chartData[0].x.push(now);
-        this.chartData[0].y.push(data.goosebump_intensity);
-        
-        // Keep only last 100 points
-        if (this.chartData[0].x.length > 100) {
-          this.chartData[0].x.shift();
-          this.chartData[0].y.shift();
-        }
-        
-        // Update chart
-        Plotly.redraw('liveChart');
-      }
-      
-      // Update device card
-      updateDeviceCard(data) {
-        let deviceCard = document.getElementById(`device-${data.device_id}`);
-        
-        if (!deviceCard) {
-          deviceCard = this.createDeviceCard(data.device_id);
-        }
-        
-        // Update image
-        const img = deviceCard.querySelector('.device-image');
-        if (img && data.img) {
-          img.src = `data:image/jpeg;base64,${data.img}`;
-        }
-        
-        // Update status
-        const status = deviceCard.querySelector('.device-status');
-        if (status) {
-          if (!data.baseline_established) {
-            status.textContent = 'Recording Baseline';
-            status.className = 'device-status px-2 py-1 rounded text-xs bg-yellow-500';
-          } else if (data.detect) {
-            status.textContent = `Goosebumps! ${data.goosebump_intensity.toFixed(1)}%`;
-            status.className = 'device-status px-2 py-1 rounded text-xs bg-red-500 animate-pulse';
-          } else {
-            status.textContent = 'Monitoring';
-            status.className = 'device-status px-2 py-1 rounded text-xs bg-green-500';
-          }
-        }
-        
-        // Update metrics
-        const metrics = deviceCard.querySelectorAll('.metric-value');
-        if (metrics.length >= 3) {
-          metrics[0].textContent = data.detection_count;
-          metrics[1].textContent = data.goosebump_intensity.toFixed(1) + '%';
-          metrics[2].textContent = data.frame_number;
-        }
-      }
-      
-      // Create device card
-      createDeviceCard(deviceId) {
-        const grid = document.getElementById('deviceGrid');
-        const card = document.createElement('div');
-        card.id = `device-${deviceId}`;
-        card.className = 'card animate-fade-in';
-        
-        card.innerHTML = `
-          <div class="flex items-center justify-between mb-4">
-            <h4 class="font-semibold truncate">${deviceId}</h4>
-            <div class="status-dot status-active"></div>
-          </div>
-          
-          <div class="aspect-video bg-black rounded-lg mb-4 overflow-hidden">
-            <img class="device-image w-full h-full object-cover" alt="Device feed">
-          </div>
-          
-          <div class="device-status px-2 py-1 rounded text-xs bg-gray-500 mb-4">
-            Initializing...
-          </div>
-          
-          <div class="grid grid-cols-3 gap-2 text-center">
-            <div>
-              <div class="metric-value text-lg font-bold text-orange-400">0</div>
-              <div class="text-xs text-gray-300">Detections</div>
-            </div>
-            <div>
-              <div class="metric-value text-lg font-bold text-green-400">0%</div>
-              <div class="text-xs text-gray-300">Intensity</div>
-            </div>
-            <div>
-              <div class="metric-value text-lg font-bold text-blue-400">0</div>
-              <div class="text-xs text-gray-300">Frames</div>
-            </div>
-          </div>
-          
-          <div class="flex space-x-2 mt-4">
-            <button class="btn btn-secondary flex-1 !py-1 !text-xs" onclick="app.resetDevice('${deviceId}')">
-              Reset
-            </button>
-            <button class="btn btn-success flex-1 !py-1 !text-xs" onclick="app.exportDevice('${deviceId}')">
-              Export
-            </button>
-          </div>
-        `;
-        
-        grid.appendChild(card);
-        return card;
-      }
-      
-      // Update statistics
-      updateStatistics(data) {
-        if (data.detect) {
-          this.stats.totalDetections++;
-        }
-        
-        if (data.goosebump_intensity > this.stats.maxIntensity) {
-          this.stats.maxIntensity = data.goosebump_intensity;
-        }
-        
-        // Update DOM
-        document.getElementById('totalDetections').textContent = this.stats.totalDetections;
-        document.getElementById('maxIntensity').textContent = this.stats.maxIntensity.toFixed(1) + '%';
-        document.getElementById('activeDevices').textContent = this.devices.size;
-      }
-      
-      // Update performance metrics
-      updatePerformanceMetrics(processingTime) {
-        this.performance.processingTimes.push(processingTime);
-        
-        // Keep only last 30 measurements
-        if (this.performance.processingTimes.length > 30) {
-          this.performance.processingTimes.shift();
-        }
-        
-        // Calculate FPS
-        const now = performance.now();
-        if (this.performance.lastFrameTime) {
-          const frameDelta = now - this.performance.lastFrameTime;
-          this.performance.fps = 1000 / frameDelta;
-        }
-        this.performance.lastFrameTime = now;
-        
-        // Update UI
-        document.getElementById('fpsCounter').textContent = `FPS: ${this.performance.fps.toFixed(1)}`;
-        document.getElementById('frameCounter').textContent = `Frame: ${this.performance.frameCount}`;
-      }
-      
-      // Utility functions
-      async blobToBase64(blob) {
-        return new Promise((resolve, reject) => {
-          const reader = new FileReader();
-          reader.onload = () => resolve(reader.result);
-          reader.onerror = reject;
-          reader.readAsDataURL(blob);
         });
       }
       
-      showToast(message, type = 'info') {
-        const toast = document.getElementById('toast');
-        const toastMessage = document.getElementById('toastMessage');
-        
-        toastMessage.textContent = message;
-        toast.className = `fixed top-4 right-4 glass p-4 rounded-xl transition-transform duration-300 z-50 ${
-          type === 'success' ? 'border-green-400' : 
-          type === 'error' ? 'border-red-400' : 
-          type === 'warning' ? 'border-yellow-400' : 'border-blue-400'
-        }`;
-        
-        toast.style.transform = 'translateX(0)';
-        
-        setTimeout(() => {
-          toast.style.transform = 'translateX(100%)';
-        }, 3000);
-      }
+      // Handle successful installation
+      window.addEventListener('appinstalled', (evt) => {
+        console.log('🎉 App was successfully installed');
+        if (installButton) installButton.style.display = 'none';
+        deferredPrompt = null;
+      });
       
-      showLoading(show) {
-        const overlay = document.getElementById('loadingOverlay');
-        overlay.classList.toggle('hidden', !show);
-      }
+      // Handle online/offline status
+      const offlineNotification = document.getElementById('offlineNotification');
       
-      updateConnectionStatus(connected) {
-        const status = document.getElementById('connectionStatus');
-        const dot = status.querySelector('.status-dot');
-        const text = status.querySelector('span');
-        
-        if (connected) {
-          dot.className = 'status-dot status-active';
-          text.textContent = 'Connected';
+      function updateOnlineStatus() {
+        if (navigator.onLine) {
+          if (offlineNotification) offlineNotification.style.display = 'none';
+          document.body.classList.remove('offline');
+          console.log('🌐 App is online');
         } else {
-          dot.className = 'status-dot status-inactive';
-          text.textContent = 'Disconnected';
+          if (offlineNotification) offlineNotification.style.display = 'block';
+          document.body.classList.add('offline');
+          console.log('📴 App is offline');
         }
       }
       
-      // Device management methods
-      updateDeviceList(devices) {
-        const select = document.getElementById('deviceSelect');
-        const currentValue = select.value;
-        
-        // Clear existing options except "All Devices"
-        select.innerHTML = '<option value="__all__">All Devices</option>';
-        
-        devices.forEach(device => {
-          const option = document.createElement('option');
-          option.value = device.id || device;
-          option.textContent = `${device.id || device} ${device.baseline_ready ? '✓' : '⏳'}`;
-          select.appendChild(option);
-          
-          this.devices.set(device.id || device, device);
-        });
-        
-        // Restore selection
-        select.value = currentValue;
-        
-        // Update active devices count
-        this.stats.activeDevices = devices.length;
-        document.getElementById('activeDevices').textContent = this.stats.activeDevices;
-      }
+      window.addEventListener('online', updateOnlineStatus);
+      window.addEventListener('offline', updateOnlineStatus);
       
-      async resetDevice(deviceId) {
-        try {
-          const response = await fetch(`/reset_baseline/${deviceId}`, { method: 'POST' });
-          if (response.ok) {
-            this.showToast(`Baseline reset for ${deviceId}`, 'success');
+      // Check initial status
+      updateOnlineStatus();
+      
+      // Periodically check online status (every 30 seconds)
+      setInterval(async () => {
+        const wasOnline = isOnline;
+        await checkOnlineStatus();
+        
+        // If online status changed, update UI
+        if (wasOnline !== isOnline) {
+          updateOnlineStatus();
+          console.log(`🔄 Connection status changed: ${isOnline ? 'online' : 'offline'}`);
+          
+          // If we're back online after being offline, refresh the page to reconnect to server
+          if (isOnline && !wasOnline) {
+            // Show a notification that we're back online
+            const reconnectNotification = document.createElement('div');
+            reconnectNotification.className = 'reconnect-notification';
+            reconnectNotification.innerHTML = `
+              <p>You're back online! <button id="refreshBtn">Refresh</button> to reconnect to the server.</p>
+            `;
+            document.body.appendChild(reconnectNotification);
+            
+            document.getElementById('refreshBtn').addEventListener('click', () => {
+              window.location.reload();
+            });
           }
-        } catch (error) {
-          this.showToast(`Error resetting ${deviceId}`, 'error');
         }
-      }
-      
-      exportDevice(deviceId) {
-        // Implementation for exporting device data
-        this.showToast(`Exporting data for ${deviceId}`, 'info');
-      }
-      
-      async installPWA() {
-        if (this.deferredPrompt) {
-          this.deferredPrompt.prompt();
-          const { outcome } = await this.deferredPrompt.userChoice;
-          
-          if (outcome === 'accepted') {
-            this.showToast('App installed successfully!', 'success');
-          }
-          
-          this.deferredPrompt = null;
-          document.getElementById('installBtn').classList.add('hidden');
-        }
+      }, 30000);
+    } else {
+      console.log('❌ Service Worker not supported - requires HTTPS or localhost');
+      // Show a message to the user about HTTPS requirement
+      const installButton = document.getElementById('installButton');
+      if (installButton) {
+        installButton.textContent = 'Requires HTTPS';
+        installButton.disabled = true;
+        installButton.style.opacity = '0.5';
       }
     }
     
-    // Initialize application
-    const app = new ChillerApp();
+    // Alternative PWA installation prompt (bottom popup)
+    const installPrompt = document.getElementById('installPrompt');
+    const installBtn = document.getElementById('installBtn');
+    const dismissInstallBtn = document.getElementById('dismissInstallBtn');
     
-    // Make app globally available for inline event handlers
-    window.app = app;
+    // Show alternative install prompt if main button doesn't work
+    function showAlternativeInstallPrompt() {
+      if (!installPrompt.classList.contains('show')) {
+        installPrompt.classList.add('show');
+      }
+    }
+    
+    // Check if we should show alternative prompt after 10 seconds
+    setTimeout(() => {
+      if (!deferredPrompt && installButton.style.display === 'none') {
+        // If no install prompt was shown and button is hidden, show alternative
+        if (!window.matchMedia('(display-mode: standalone)').matches && !window.navigator.standalone) {
+          showAlternativeInstallPrompt();
+        }
+      }
+    }, 10000);
+    
+    installBtn.addEventListener('click', () => {
+      // Hide the app provided install promotion
+      installPrompt.classList.remove('show');
+      
+      if (deferredPrompt) {
+        // Show the install prompt
+        deferredPrompt.prompt();
+        // Wait for the user to respond to the prompt
+        deferredPrompt.userChoice.then((choiceResult) => {
+          if (choiceResult.outcome === 'accepted') {
+            console.log('User accepted the install prompt');
+          } else {
+            console.log('User dismissed the install prompt');
+          }
+          deferredPrompt = null;
+        });
+      } else {
+        // Fallback instructions
+        if (/iPhone|iPad|iPod/.test(navigator.userAgent)) {
+          alert('To install this app on iOS:\n1. Tap the Share button (□↑)\n2. Scroll down and tap "Add to Home Screen"\n3. Tap "Add" to confirm');
+        } else if (/Android/.test(navigator.userAgent)) {
+          alert('To install this app on Android:\n1. Tap the menu (⋮) in your browser\n2. Tap "Add to Home screen" or "Install app"\n3. Follow the prompts');
+        } else {
+          alert('To install this app:\n1. Look for "Install" in your browser menu\n2. Or bookmark this page for easy access');
+        }
+      }
+    });
+    
+    dismissInstallBtn.addEventListener('click', () => {
+      installPrompt.classList.remove('show');
+    });
+    
+    // Socket.io connection
+    const socket = io();
+    let selectedDevice = '__all__';
+    const deviceCards = new Map(); // id -> {root,img,overlay,stats,chart,chartLabels,chartData,detections}
+    
+    // Track last activity time for each device
+    const deviceLastActive = new Map();
+    const INACTIVE_THRESHOLD = 60000; // 60 seconds of inactivity to consider a device inactive
+    
+    // Function to clean up inactive devices
+    function cleanupInactiveDevices() {
+      const now = Date.now();
+      const inactiveDevices = [];
+      
+      deviceLastActive.forEach((lastActiveTime, id) => {
+        const timeSinceActive = now - lastActiveTime;
+        const deviceCard = deviceCards.get(id);
+        
+        if (deviceCard) {
+          // Find the status indicator in the card
+          const statusIndicator = deviceCard.root.querySelector('.status-indicator');
+          
+          if (timeSinceActive > INACTIVE_THRESHOLD) {
+            inactiveDevices.push(id);
+          } else if (timeSinceActive > INACTIVE_THRESHOLD / 2) {
+            // If device has been inactive for half the threshold, mark it as inactive but don't remove yet
+            if (statusIndicator) {
+              statusIndicator.classList.remove('active');
+              statusIndicator.classList.add('inactive');
+            }
+          } else {
+            // Make sure active devices have the correct status indicator
+            if (statusIndicator) {
+              statusIndicator.classList.remove('inactive');
+              statusIndicator.classList.add('active');
+            }
+          }
+        }
+      });
+      
+      // If we found inactive devices, update the device list
+      if (inactiveDevices.length > 0) {
+        // Get current active devices from select
+        const select = document.getElementById('deviceSelect');
+        const activeDevices = [];
+        
+        for (let i = 1; i < select.options.length; i++) { // Skip the 'All active devices' option
+          const deviceId = select.options[i].value;
+          if (!inactiveDevices.includes(deviceId)) {
+            activeDevices.push(deviceId);
+          }
+        }
+        
+        // Update the device list with only active devices
+        updateDeviceList(activeDevices);
+      }
+    }
+    
+    // Run cleanup every 30 seconds
+    setInterval(cleanupInactiveDevices, 30000);
+
+    const chartOptions = {
+      responsive: true, 
+      maintainAspectRatio: false, 
+      animation: false,
+      interaction: { mode: 'index', intersect: false },
+      plugins: { 
+        legend: { display: false }, 
+        tooltip: { 
+          backgroundColor: 'rgba(0,0,0,0.8)', 
+          titleColor: '#fff', 
+          bodyColor: '#fff',
+          callbacks: {
+            label: function(context) {
+              const dataIndex = context.dataIndex;
+              const dataset = context.chart.data.datasets[0];
+              const frameNumber = dataset.frameNumbers ? dataset.frameNumbers[dataIndex] : 'N/A';
+              return [
+                `Intensity: ${context.raw.toFixed(2)}%`,
+                `Frame: ${frameNumber}`
+              ];
+            }
+          }
+        } 
+      },
+      scales: {
+        x: { 
+          ticks: { color: '#fff', maxRotation: 0, autoSkip: true, maxTicksLimit: 8 }, 
+          grid: { color: 'rgba(255,255,255,0.1)' },
+          title: { display: true, text: 'Time', color: '#fff' }
+        },
+        y: { 
+          min: -10, 
+          max: 100, 
+          ticks: { color: '#fff' }, 
+          title: { display: true, text: 'Intensity (%)', color: '#fff' }, 
+          grid: { color: 'rgba(255,255,255,0.1)' } 
+        }
+      }
+    };
+
+    function buildCard(id){
+      if (deviceCards.has(id)) return deviceCards.get(id);
+      const grid = document.getElementById('cardsGrid');
+      const card = document.createElement('div');
+      card.className = 'device-card';
+      card.dataset.device = id;
+
+      // header
+      const header = document.createElement('div'); header.className = 'device-card__header';
+      const titleContainer = document.createElement('div'); titleContainer.className = 'device-card__title-container';
+      const title = document.createElement('div'); title.className = 'device-card__title'; title.textContent = id;
+      const statusIndicator = document.createElement('div'); statusIndicator.className = 'status-indicator active'; // Start as active
+      titleContainer.append(title, statusIndicator);
+      
+      const actions = document.createElement('div'); actions.className = 'device-card__actions';
+      const btnReset = document.createElement('button'); btnReset.className = 'sm-btn'; btnReset.textContent = 'Reset'; btnReset.onclick = () => perDeviceReset(id);
+      const btnCSV = document.createElement('button'); btnCSV.className = 'sm-btn'; btnCSV.textContent = 'Export'; btnCSV.onclick = () => perDeviceExport(id);
+      actions.append(btnReset, btnCSV); header.append(titleContainer, actions);
+
+      // feed
+      const feed = document.createElement('div'); feed.className = 'device-card__feed';
+      const img = document.createElement('img');
+      const overlay = document.createElement('div'); overlay.className = 'feed-overlay monitor'; overlay.textContent = 'Initializing…';
+      feed.append(img, overlay);
+
+      // stats
+      const stats = document.createElement('div'); stats.className = 'device-card__stats';
+      const s1 = statBox('Baseline'); const s2 = statBox('Power'); const s3 = statBox('Detections'); const s4 = statBox('Frames');
+      stats.append(s1.root, s2.root, s3.root, s4.root);
+
+      // chart
+      const chartWrap = document.createElement('div'); chartWrap.className = 'device-card__chart';
+      const canvas = document.createElement('canvas'); canvas.id = `chart-${id}`; chartWrap.appendChild(canvas);      
+
+      // assemble
+      card.append(header, feed, stats, chartWrap); grid.appendChild(card);
+
+      // create chart
+      const ctx = canvas.getContext('2d');
+      const chart = new Chart(ctx, { type: 'line', data: { labels: [], datasets: [{ label: 'Intensity (%)', data: [], borderColor: '#51cf66', backgroundColor: '#51cf6633', borderWidth: 3, tension: 0.4, pointRadius: 0, fill: true }] }, options: chartOptions });
+
+      const entry = { root: card, img, overlay, stats: { baseline: s1, power: s2, detect: s3, frames: s4 }, chart, chartLabels: [], chartData: [], detections: [] };
+      deviceCards.set(id, entry);
+      return entry;
+    }
+
+    function statBox(label){
+      const root = document.createElement('div'); root.className = 'stat';
+      const l = document.createElement('div'); l.className = 'label'; l.textContent = label;
+      const v = document.createElement('div'); v.className = 'val'; v.textContent = '--';
+      root.append(l,v); return { root, labelEl: l, valEl: v, set: (x)=> v.textContent = x };
+    }
+
+    // Device filter (All vs single)
+    function applyFilter(){
+      const grid = document.getElementById('cardsGrid');
+      const select = document.getElementById('deviceSelect');
+      
+      // Get the list of active device IDs from the select options
+      const activeDeviceIds = new Set();
+      for (let i = 0; i < select.options.length; i++) {
+        const value = select.options[i].value;
+        if (value !== '__all__') {
+          activeDeviceIds.add(value);
+        }
+      }
+      
+      if (selectedDevice === '__all__') { 
+        grid.classList.remove('single-only'); 
+        // Only show cards for active devices
+        deviceCards.forEach(({root}, id) => {
+          root.style.display = activeDeviceIds.has(id) ? 'flex' : 'none';
+        }); 
+      }
+      else { 
+        grid.classList.add('single-only'); 
+        deviceCards.forEach(({root}, id) => {
+          root.style.display = (id === selectedDevice) ? 'flex' : 'none';
+        }); 
+      }
+    }
+
+    // Per-device actions
+    async function perDeviceReset(id){
+      try { const r = await fetch(`/reset_baseline/${id}`, { method: 'POST' }); if (r.ok) alert(`Baseline reset for ${id}`); } catch (e) { alert('Error: ' + e.message); }
+    }
+    function perDeviceExport(id){
+      const entry = deviceCards.get(id); if (!entry || entry.detections.length === 0) { alert('No detections to export!'); return; }      
+      const csv = 'Device,Time,Frame,Intensity' + entry.detections.map(d => `${id},${d.time},${d.frame},${d.intensity}`).join('');
+      const blob = new Blob([csv], { type: 'text/csv' }); const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url; a.download = `chiller_${id}_${Date.now()}.csv`; a.click();
+    }
+
+    // Global controls
+    document.getElementById('resetBaseline').onclick = async () => {
+      if (selectedDevice === '__all__') {
+        const ids = Array.from(deviceCards.keys()); if (!ids.length) return; if (!confirm('Reset baseline for ALL devices?')) return;
+        await Promise.all(ids.map(id => fetch(`/reset_baseline/${id}`, { method: 'POST' }))); alert('Baselines reset for all devices');
+      } else { perDeviceReset(selectedDevice); }
+    };
+    document.getElementById('exportData').onclick = () => {
+      if (selectedDevice === '__all__') {
+        const rows = []; deviceCards.forEach((entry, id) => entry.detections.forEach(d => rows.push(`${id},${d.time},${d.frame},${d.intensity}`)));
+        if (!rows.length) { alert('No detections to export!'); return; }
+        const csv = 'Device,Time,Frame,Intensity' + rows.join('');
+        const blob = new Blob([csv], { type: 'text/csv' }); const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url; a.download = `chiller_ALL_${Date.now()}.csv`; a.click();
+      } else { perDeviceExport(selectedDevice); }
+    };
+
+    // Incoming frames
+    socket.on('frame', (data) => {
+      if (!(selectedDevice === '__all__' || data.device_id === selectedDevice)) return;
+      const entry = buildCard(data.device_id);
+
+      // Update last active time for this device
+      deviceLastActive.set(data.device_id, Date.now());
+      
+      // Make sure the device card is visible since it's active
+      entry.root.style.display = 'flex';
+      
+      // Update the status indicator to show this device is active
+      const statusIndicator = entry.root.querySelector('.status-indicator');
+      if (statusIndicator) {
+        statusIndicator.classList.remove('inactive');
+        statusIndicator.classList.add('active');
+      }
+
+      // Image
+      try { entry.img.src = 'data:image/jpeg;base64,' + data.img; } catch(e) {}
+
+      // Overlay (status)
+      if (!data.baseline_established) { 
+        entry.overlay.className = 'feed-overlay baseline'; 
+        entry.overlay.innerHTML = `<div>Recording baseline</div><div class="frame-counter">Frame: ${data.frame_number}</div>`; 
+      }
+      else if (data.detect) { 
+        entry.overlay.className = 'feed-overlay detect'; 
+        entry.overlay.innerHTML = `<div>Goosebumps! (${data.goosebump_intensity.toFixed(1)}%)</div><div class="frame-counter">Frame: ${data.frame_number}</div>`; 
+      }
+      else { 
+        entry.overlay.className = 'feed-overlay monitor'; 
+        entry.overlay.innerHTML = `<div>Monitoring</div><div class="frame-counter">Frame: ${data.frame_number}</div>`; 
+      }
+
+      // Stats
+      entry.stats.frames.set(data.frame_number);
+      entry.stats.detect.set(data.detection_count);
+      entry.stats.power.set(data.current_power.toFixed(2));
+      entry.stats.baseline.set(data.baseline_established ? data.baseline_power.toFixed(2) : '…');
+
+      // Chart (1 dataset per device)
+      if (data.baseline_established) {
+        const labels = entry.chart.data.labels; 
+        const series = entry.chart.data.datasets[0].data;
+        
+        // Initialize frameNumbers array if it doesn't exist
+        if (!entry.chart.data.datasets[0].frameNumbers) {
+          entry.chart.data.datasets[0].frameNumbers = [];
+        }
+        
+        // Format timestamp for better readability
+        const formattedTime = new Date(data.timestamp).toLocaleTimeString();
+        
+        // Add new data points
+        labels.push(formattedTime); 
+        series.push(data.goosebump_intensity);
+        entry.chart.data.datasets[0].frameNumbers.push(data.frame_number);
+        
+        // Keep only the last 60 data points
+        if (labels.length > 60) { 
+          labels.shift(); 
+          series.shift(); 
+          entry.chart.data.datasets[0].frameNumbers.shift();
+        }
+        
+        // Update chart with animation for better visibility
+        entry.chart.update('none');
+      }
+
+      // Detections list
+      if (data.detect) {
+        entry.detections.push({ time: data.timestamp, intensity: data.goosebump_intensity, frame: data.frame_number });
+      }
+      
+      // Reapply filter to ensure proper display
+      applyFilter();
+    });
+
+    // Devices list & filter
+    socket.on('devices', (msg) => updateDeviceList(msg.devices || []));
+    function updateDeviceList(devices){
+      const select = document.getElementById('deviceSelect');
+      const current = select.value || '__all__';
+      select.innerHTML = '<option value="__all__">All active devices</option>';
+      
+      // Track active devices and clean up inactive ones
+      const activeDeviceIds = new Set();
+      
+      devices.forEach(dev => {
+        const info = typeof dev === 'object' ? dev : { id: dev };
+        const opt = document.createElement('option'); 
+        opt.value = info.id; 
+        opt.textContent = `${info.id}${info.baseline_ready ? ' ✓' : ' ⏳'}`; 
+        select.appendChild(opt);
+        buildCard(info.id); // ensure a card exists for each device
+        activeDeviceIds.add(info.id);
+      });
+      
+      // Remove cards for devices that are no longer active
+      deviceCards.forEach((entry, id) => {
+        if (!activeDeviceIds.has(id)) {
+          // Hide the card for inactive devices
+          entry.root.style.display = 'none';
+        }
+      });
+      
+      // Keep selection
+      const ids = activeDeviceIds;
+      if (current !== '__all__' && !ids.has(current)) { select.value='__all__'; selectedDevice='__all__'; }
+      else { select.value=current; selectedDevice=current; }
+      applyFilter();
+    }
+
+    document.getElementById('deviceSelect').addEventListener('change', (e)=>{ selectedDevice = e.target.value || '__all__'; applyFilter(); });
+
+    // First load: fetch initial devices
+    fetch('/devices').then(r=>r.json()).then(d=>updateDeviceList(d.devices || [])).catch(console.error);
+    
+    // Mobile camera functionality
+    const cameraBtn = document.getElementById('cameraBtn');
+    const videoUpload = document.getElementById('videoUpload');
+    const videoContainer = document.getElementById('videoContainer');
+    const videoElement = document.getElementById('videoElement');
+    
+    // Network status helper function
+    function checkOnlineStatus() {
+      return new Promise((resolve, reject) => {
+        // If the browser reports we're online, run a fetch test
+        if (navigator.onLine) {
+          fetch('/manifest.json', { method: 'HEAD', cache: 'no-store' })
+            .then(() => {
+              isOnline = true;
+              resolve(true);
+            })
+            .catch(() => {
+              isOnline = false;
+              resolve(false);
+            });
+        } else {
+          isOnline = false;
+          resolve(false);
+        }
+      });
+    }
+    const videoOverlay = document.getElementById('videoOverlay');
+    const closeVideoBtn = document.getElementById('closeVideoBtn');
+    const flashlightBtn = document.getElementById('flashlightBtn');
+    const liveGraphContainer = document.getElementById('liveGraphContainer');
+    const liveGraphCanvas = document.getElementById('liveGraph');
+    
+    let stream = null;
+    let flashlightOn = false;
+    let mediaRecorder = null;
+    let recordedChunks = [];
+    let deviceId = 'mobile-camera-' + Date.now();
+    
+    // Live graph setup
+    const liveGraphCtx = liveGraphCanvas.getContext('2d');
+    const liveGraphChart = new Chart(liveGraphCtx, {
+      type: 'line',
+      data: {
+        labels: [],
+        datasets: [{
+          label: 'Goosebump Intensity',
+          data: [],
+          borderColor: '#51cf66',
+          backgroundColor: 'rgba(81, 207, 102, 0.2)',
+          borderWidth: 2,
+          tension: 0.4,
+          fill: true
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        animation: false,
+        interaction: {
+          mode: 'index',
+          intersect: false
+        },
+        scales: {
+          x: {
+            ticks: { color: '#fff', maxRotation: 0, autoSkip: true, maxTicksLimit: 8 },
+            grid: { color: 'rgba(255,255,255,0.1)' },
+            title: { display: true, text: 'Time', color: '#fff' }
+          },
+          y: {
+            min: -10,
+            max: 100,
+            ticks: { color: '#fff' },
+            title: { display: true, text: 'Intensity (%)', color: '#fff' },
+            grid: { color: 'rgba(255,255,255,0.1)' }
+          }
+        },
+        plugins: {
+          legend: { display: false },
+          tooltip: {
+            callbacks: {
+              afterLabel: function(context) {
+                const frameNumber = context.chart.data.datasets[1]?.data[context.dataIndex];
+                return frameNumber ? `Frame: ${frameNumber}` : '';
+              }
+            }
+          }
+        }
+      }
+    });
+    
+    // Setup mediaDevices.getUserMedia polyfill and check for secure context
+    function setupMediaDevices() {
+      const hostname = window.location.hostname;
+      const isRailway = hostname.includes('railway.app') || hostname.includes('up.railway.app');
+      const isLocalhost = hostname === 'localhost' || hostname === '127.0.0.1';
+      
+      // Check if we're in a secure context (HTTPS, localhost, or Railway)
+      if (!window.isSecureContext && !isRailway) {
+        console.warn('⚠️ Camera access requires a secure context (HTTPS or localhost)');
+        console.warn('Current URL:', window.location.href);
+        console.warn('Protocol:', window.location.protocol);
+        
+        // Show user-friendly message
+        const cameraBtn = document.getElementById('cameraBtn');
+        if (cameraBtn) {
+          cameraBtn.textContent = '🔒 Camera (Requires HTTPS)';
+          cameraBtn.disabled = true;
+          cameraBtn.style.opacity = '0.5';
+          cameraBtn.title = 'Camera access requires HTTPS or localhost';
+        }
+        return false;
+      }
+      
+      console.log('✅ Secure context detected:', { 
+        isSecureContext: window.isSecureContext, 
+        isRailway, 
+        isLocalhost, 
+        hostname 
+      });
+      
+      // First check if mediaDevices exists at all
+      if (!navigator.mediaDevices) {
+        console.warn('⚠️ navigator.mediaDevices not available');
+        navigator.mediaDevices = {};
+      }
+      
+      // Add enumerateDevices if not available
+      if (!navigator.mediaDevices.enumerateDevices) {
+        navigator.mediaDevices.enumerateDevices = function() {
+          return Promise.resolve([]);
+        };
+      }
+      
+      // Add getUserMedia if not available
+      if (!navigator.mediaDevices.getUserMedia) {
+        navigator.mediaDevices.getUserMedia = function(constraints) {
+          // First get older versions of getUserMedia if they exist
+          const getUserMedia = navigator.webkitGetUserMedia || navigator.mozGetUserMedia || navigator.msGetUserMedia;
+          
+          // If no getUserMedia exists, return a rejected promise
+          if (!getUserMedia) {
+            return Promise.reject(new Error('getUserMedia is not supported in this browser or requires HTTPS'));
+          }
+          
+          // Otherwise, wrap the call to the old navigator.getUserMedia with a Promise
+          return new Promise(function(resolve, reject) {
+            getUserMedia.call(navigator, constraints, resolve, reject);
+          });
+        };
+      }
+      
+      return true;
+    }
+    
+    // Setup media devices when page loads
+    const mediaDevicesAvailable = setupMediaDevices();
+    
+    // Camera button click handler
+    cameraBtn.addEventListener('click', async () => {
+      // Check if media devices are available
+      if (!mediaDevicesAvailable) {
+        alert('Camera access requires HTTPS or localhost. Please use:\n\n• https://your-domain.com\n• http://localhost:8000\n• http://127.0.0.1:8000');
+        return;
+      }
+      
+      // Check if we're online first
+      await checkOnlineStatus();
+      if (!isOnline) {
+        console.warn('Cannot access camera while offline');
+        alert('Camera access is not available in offline mode');
+        return;
+      }
+      
+      try {
+        // First list available cameras to select the best one
+        const devices = await navigator.mediaDevices.enumerateDevices();
+        const videoDevices = devices.filter(device => device.kind === 'videoinput');
+        
+        // If we have multiple cameras, try to find the back camera (environment facing)
+        let selectedCamera = null;
+        if (videoDevices.length > 1) {
+          // Try to find a back camera first
+          for (const device of videoDevices) {
+            if (device.label.toLowerCase().includes('back') || 
+                device.label.toLowerCase().includes('rear') || 
+                device.label.toLowerCase().includes('environment')) {
+              selectedCamera = device.deviceId;
+              console.log('Selected back camera:', device.label);
+              break;
+            }
+          }
+          
+          // If no back camera found, use the first one that's not labeled as front
+          if (!selectedCamera) {
+            for (const device of videoDevices) {
+              if (!device.label.toLowerCase().includes('front')) {
+                selectedCamera = device.deviceId;
+                console.log('Selected camera:', device.label);
+                break;
+              }
+            }
+          }
+          
+          // If still no camera selected, use the first one
+          if (!selectedCamera && videoDevices.length > 0) {
+            selectedCamera = videoDevices[0].deviceId;
+            console.log('Selected first available camera:', videoDevices[0].label);
+          }
+        }
+        
+        // Request camera with optimized settings for performance
+        const constraints = {
+          video: {
+            deviceId: selectedCamera ? { exact: selectedCamera } : undefined,
+            facingMode: selectedCamera ? undefined : 'environment',
+            width: { ideal: 640, max: 1280 }, // Reduced resolution for better performance
+            height: { ideal: 480, max: 720 },
+            frameRate: { ideal: 15, max: 20 }, // Lower frame rate for better performance
+            focusMode: 'continuous',
+            exposureMode: 'continuous',
+            whiteBalanceMode: 'continuous'
+          }
+        };
+        
+        if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+          throw new Error('Camera access requires HTTPS or a secure context. Please use HTTPS or localhost.');
+        }
+        
+        stream = await navigator.mediaDevices.getUserMedia(constraints);
+        videoElement.srcObject = stream;
+        videoContainer.classList.add('active');
+        liveGraphContainer.classList.add('active');
+        
+        // Display camera info
+        const track = stream.getVideoTracks()[0];
+        const settings = track.getSettings();
+        console.log('Camera settings:', settings);
+        videoOverlay.innerHTML = `<div class="camera-info">Camera: ${settings.width}x${settings.height} @${settings.frameRate}fps</div>`;
+        
+        // Start sending frames to server
+        startProcessingCameraFrames();
+        
+      } catch (err) {
+        console.error('Error accessing camera:', err);
+        
+        // Provide more helpful error messages based on the error type
+        let errorMessage = 'Could not access camera: ' + err.message;
+        
+        if (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError') {
+          errorMessage = 'Camera access was denied. Please allow camera access and try again.';
+        } else if (err.name === 'NotFoundError' || err.name === 'DevicesNotFoundError') {
+          errorMessage = 'No camera found on this device.';
+        } else if (err.name === 'NotReadableError' || err.name === 'TrackStartError') {
+          errorMessage = 'Camera is already in use by another application.';
+        } else if (err.name === 'OverconstrainedError') {
+          // Try again with lower constraints
+          try {
+            const lowerConstraints = {
+              video: {
+                facingMode: 'environment',
+                width: { ideal: 1280 },
+                height: { ideal: 720 }
+              }
+            };
+            stream = await navigator.mediaDevices.getUserMedia(lowerConstraints);
+            videoElement.srcObject = stream;
+            videoContainer.classList.add('active');
+            liveGraphContainer.classList.add('active');
+            videoOverlay.innerHTML = '<div class="camera-info">Using lower quality camera mode</div>';
+            startProcessingCameraFrames();
+            return;
+          } catch (fallbackErr) {
+            errorMessage = 'Camera does not meet the required constraints. Please try a different device.';
+          }
+        } else if (err.name === 'TypeError' && err.message.includes('getUserMedia')) {
+          errorMessage = 'Camera access requires HTTPS. Please use a secure connection.';
+        }
+        
+        alert(errorMessage);
+      }
+    });
+    
+    // Close video button
+    closeVideoBtn.addEventListener('click', () => {
+      stopCamera();
+    });
+    
+    // Flashlight toggle
+    flashlightBtn.addEventListener('click', () => {
+      toggleFlashlight();
+    });
+    
+    // Video upload handler
+    videoUpload.addEventListener('change', async (e) => {
+      // Check if we're online first
+      await checkOnlineStatus();
+      if (!isOnline) {
+        console.warn('Cannot process video while offline');
+        alert('Video processing is not available in offline mode');
+        e.target.value = ''; // Reset the file input
+        return;
+      }
+      const file = e.target.files[0];
+      if (file) {
+        // Stop any existing camera stream first
+        stopCamera();
+        
+        const videoURL = URL.createObjectURL(file);
+        videoElement.src = videoURL;
+        videoElement.srcObject = null;
+        videoContainer.classList.add('active');
+        
+        // We don't show the live graph for uploaded videos to avoid duplicate footage
+        // liveGraphContainer.classList.add('active');
+        
+        // Start processing video frames when video is loaded
+        videoElement.onloadedmetadata = () => {
+          videoElement.play();
+          startProcessingVideoFrames();
+        };
+      }
+    });
+    
+    function stopCamera() {
+      if (stream) {
+        stream.getTracks().forEach(track => track.stop());
+        stream = null;
+      }
+      videoElement.srcObject = null;
+      videoElement.src = '';
+      videoContainer.classList.remove('active');
+      liveGraphContainer.classList.remove('active');
+      
+      // Reset graph
+      liveGraphChart.data.labels = [];
+      liveGraphChart.data.datasets[0].data = [];
+      liveGraphChart.update();
+    }
+    
+    async function toggleFlashlight() {
+      if (!stream) return;
+      
+      const track = stream.getVideoTracks()[0];
+      const capabilities = track.getCapabilities();
+      
+      // Check if torch is supported
+      if (capabilities.torch) {
+        flashlightOn = !flashlightOn;
+        try {
+          await track.applyConstraints({
+            advanced: [{ torch: flashlightOn }]
+          });
+          flashlightBtn.textContent = flashlightOn ? '🔦' : '💡';
+        } catch (err) {
+          console.error('Error toggling flashlight:', err);
+          alert('Could not toggle flashlight: ' + err.message);
+        }
+      } else {
+        alert('Flashlight not supported on this device');
+      }
+    }
+    
+    function startProcessingCameraFrames() {
+      const canvas = document.createElement('canvas');
+      const ctx = canvas.getContext('2d', { alpha: false }); // Disable alpha for better performance
+      let captureInterval = 500; // Start with 500ms (2fps) for better performance
+      let frameCount = 0;
+      let lastPerformanceCheck = performance.now();
+      let processingTime = 0;
+      let isProcessing = false; // Prevent overlapping requests
+      
+      // Generate a unique camera device ID
+      const cameraDeviceId = 'mobile-camera-' + Date.now();
+      
+      // Initialize this device as active
+      deviceLastActive.set(cameraDeviceId, Date.now());
+      
+      // Function to update canvas size based on current video dimensions
+      const updateCanvasSize = () => {
+        // Get the actual video dimensions
+        const videoWidth = videoElement.videoWidth;
+        const videoHeight = videoElement.videoHeight;
+        
+        if (videoWidth && videoHeight) {
+          // Update canvas size to match video
+          canvas.width = videoWidth;
+          canvas.height = videoHeight;
+          console.log(`Canvas size updated to ${videoWidth}x${videoHeight}`);
+          return true;
+        }
+        return false;
+      };
+      
+      // Try to set initial canvas size
+      updateCanvasSize();
+      
+      const captureFrame = () => {
+        if (!stream || isProcessing) return; // Stop if camera is closed or already processing
+        
+        isProcessing = true;
+        const startTime = performance.now();
+        
+        try {
+          // Check if we need to update canvas size (less frequently)
+          if (frameCount % 60 === 0) { // Check dimensions every 60 frames instead of 30
+            updateCanvasSize();
+          }
+          
+          // Draw current video frame to canvas with reduced size for better performance
+          const targetWidth = Math.min(canvas.width, 640); // Limit to 640px width max
+          const targetHeight = Math.min(canvas.height, 480); // Limit to 480px height max
+          
+          // Update canvas size if needed
+          if (canvas.width !== targetWidth || canvas.height !== targetHeight) {
+            canvas.width = targetWidth;
+            canvas.height = targetHeight;
+          }
+          
+          ctx.drawImage(videoElement, 0, 0, targetWidth, targetHeight);
+          
+          // Convert to JPEG with lower quality for better performance
+          canvas.toBlob((blob) => {
+            if (!blob) {
+              console.error('Failed to create blob from canvas');
+              isProcessing = false;
+              scheduleNextFrame();
+              return;
+            }
+            
+            const reader = new FileReader();
+            reader.onloadend = () => {
+              if (!reader.result) {
+                console.error('Failed to read blob data');
+                isProcessing = false;
+                scheduleNextFrame();
+                return;
+              }
+              
+              const base64data = reader.result.split(',')[1];
+              
+              // Update frame counter in overlay (less frequently to reduce DOM updates)
+              frameCount++;
+              if (videoOverlay && frameCount % 5 === 0) { // Update overlay every 5 frames
+                const existingInfo = videoOverlay.querySelector('.frame-info');
+                if (existingInfo) {
+                  existingInfo.textContent = `Frame: ${frameCount}`;
+                } else {
+                  const frameInfo = document.createElement('div');
+                  frameInfo.className = 'frame-info';
+                  frameInfo.textContent = `Frame: ${frameCount}`;
+                  videoOverlay.appendChild(frameInfo);
+                }
+              }
+              
+              // Send to server with the unique camera ID
+              fetch('/upload_frame', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  device_id: cameraDeviceId,
+                  jpg_b64: base64data,
+                  frame_number: frameCount
+                })
+              })
+              .then(response => response.json())
+              .then(data => {
+                // Update last active time for this device
+                deviceLastActive.set(cameraDeviceId, Date.now());
+                
+                // Update live graph with intensity data
+                if (data.intensity !== undefined && data.status !== 'skipped') {
+                  updateLiveGraph(data.intensity, frameCount);
+                  
+                  // Update overlay with detection info (only when detection changes)
+                  if (videoOverlay) {
+                    const existingDetection = videoOverlay.querySelector('.detection-info');
+                    if (data.detect && !existingDetection) {
+                      videoOverlay.classList.add('detection-active');
+                      const detectionInfo = document.createElement('div');
+                      detectionInfo.className = 'detection-info';
+                      detectionInfo.textContent = `Goosebumps detected! (${data.intensity.toFixed(1)}%)`;
+                      videoOverlay.appendChild(detectionInfo);
+                    } else if (!data.detect && existingDetection) {
+                      videoOverlay.classList.remove('detection-active');
+                      existingDetection.remove();
+                    } else if (data.detect && existingDetection) {
+                      existingDetection.textContent = `Goosebumps detected! (${data.intensity.toFixed(1)}%)`;
+                    }
+                  }
+                }
+                
+                // Update performance info
+                if (frameCount % 10 === 0) { // Update every 10 frames
+                  const fps = 1000 / captureInterval;
+                  const perfInfo = videoOverlay.querySelector('.perf-info');
+                  if (perfInfo) {
+                    perfInfo.textContent = `FPS: ${fps.toFixed(1)} | Processing: ${processingTime.toFixed(0)}ms`;
+                  } else {
+                    const perfDiv = document.createElement('div');
+                    perfDiv.className = 'perf-info';
+                    perfDiv.style.cssText = 'position: absolute; top: 70px; left: 10px; background: rgba(0,0,0,0.6); color: white; padding: 3px 8px; border-radius: 4px; font-size: 12px;';
+                    perfDiv.textContent = `FPS: ${fps.toFixed(1)} | Processing: ${processingTime.toFixed(0)}ms`;
+                    videoOverlay.appendChild(perfDiv);
+                  }
+                }
+                
+                // Measure processing time and adjust capture interval if needed
+                processingTime = performance.now() - startTime;
+                
+                // Every 30 frames, check if we need to adjust the capture interval
+                if (frameCount % 30 === 0) {
+                  const now = performance.now();
+                  const elapsed = now - lastPerformanceCheck;
+                  const fps = 30 / (elapsed / 1000);
+                  console.log(`Current FPS: ${fps.toFixed(1)}, Processing time: ${processingTime.toFixed(1)}ms`);
+                  
+                  // More conservative adjustment of capture interval
+                  if (processingTime > captureInterval * 0.9) {
+                    // Processing is taking too long, slow down more aggressively
+                    captureInterval = Math.min(1000, captureInterval + 100);
+                    console.log(`Slowing down to ${captureInterval}ms interval`);
+                  } else if (processingTime < captureInterval * 0.4 && captureInterval > 300) {
+                    // Processing is fast, speed up more conservatively
+                    captureInterval = Math.max(300, captureInterval - 50);
+                    console.log(`Speeding up to ${captureInterval}ms interval`);
+                  }
+                  
+                  lastPerformanceCheck = now;
+                }
+                
+                isProcessing = false;
+                scheduleNextFrame();
+              })
+              .catch(err => {
+                console.error('Error sending frame:', err);
+                isProcessing = false;
+                scheduleNextFrame();
+              });
+            };
+            
+            reader.onerror = () => {
+              console.error('Error reading blob data');
+              isProcessing = false;
+              scheduleNextFrame();
+            };
+            
+            reader.readAsDataURL(blob);
+          }, 'image/jpeg', 0.7); // Lower quality for better performance
+        } catch (err) {
+          console.error('Error capturing frame:', err);
+          isProcessing = false;
+          scheduleNextFrame();
+        }
+      };
+      
+      // Helper function to schedule the next frame capture
+      const scheduleNextFrame = () => {
+        if (stream) {
+          setTimeout(captureFrame, captureInterval);
+        }
+      };
+      
+      // Start capturing frames when video is playing
+      videoElement.addEventListener('playing', () => {
+        if (updateCanvasSize()) {
+          captureFrame();
+        } else {
+          // If we couldn't get video dimensions, try again after a short delay
+          setTimeout(() => {
+            if (updateCanvasSize()) {
+              captureFrame();
+            } else {
+              // Use default dimensions if still can't get video size
+              canvas.width = 1280;
+              canvas.height = 720;
+              captureFrame();
+            }
+          }, 500);
+        }
+      }, { once: true });
+    }
+    
+    function startProcessingVideoFrames() {
+      const canvas = document.createElement('canvas');
+      const ctx = canvas.getContext('2d');
+      const captureInterval = 200; // Capture every 200ms (5fps)
+      let frameCount = 0; // Add frame counter for uploaded videos
+      
+      // Set canvas size to match video
+      canvas.width = videoElement.videoWidth || 640;
+      canvas.height = videoElement.videoHeight || 480;
+      
+      // Generate a unique device ID for this video upload to avoid conflicts with camera feed
+      const videoUploadId = 'video-upload-' + Date.now();
+      
+      // Initialize this device as active
+      deviceLastActive.set(videoUploadId, Date.now());
+      
+      const captureFrame = () => {
+        if (videoElement.paused || videoElement.ended) return;
+        
+        try {
+          // Draw current video frame to canvas
+          ctx.drawImage(videoElement, 0, 0, canvas.width, canvas.height);
+          
+          // Increment frame counter
+          frameCount++;
+          
+          // Convert to JPEG and base64 encode
+          canvas.toBlob((blob) => {
+            const reader = new FileReader();
+            reader.onloadend = () => {
+              const base64data = reader.result.split(',')[1];
+              
+              // Send to server with the unique video upload ID
+              fetch('/upload_frame', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  device_id: videoUploadId, // Use the unique ID instead of the global deviceId
+                  jpg_b64: base64data,
+                  frame_number: frameCount // Add frame number to match Python script behavior
+                })
+              })
+              .then(response => response.json())
+              .then(data => {
+                // Update last active time for this device
+                deviceLastActive.set(videoUploadId, Date.now());
+                
+                // We don't update the live graph for uploaded videos to avoid duplicate footage
+                // This ensures only the device cards show the processed frames
+                // if (data.intensity !== undefined) {
+                //   updateLiveGraph(data.intensity);
+                // }
+              })
+              .catch(err => console.error('Error sending frame:', err));
+            };
+            reader.readAsDataURL(blob);
+          }, 'image/jpeg', 0.8);
+          
+          // Schedule next capture if video is still playing
+          if (!videoElement.paused && !videoElement.ended) {
+            setTimeout(captureFrame, captureInterval);
+          }
+        } catch (err) {
+          console.error('Error capturing frame:', err);
+          if (!videoElement.paused && !videoElement.ended) {
+            setTimeout(captureFrame, captureInterval);
+          }
+        }
+      };
+      
+      // Start capturing frames
+      captureFrame();
+    }
+    
+    let lastGraphUpdate = 0;
+    const GRAPH_UPDATE_INTERVAL = 1000; // Update graph at most once per second
+    
+    function updateLiveGraph(intensity, frameNumber) {
+      const now = Date.now();
+      
+      // Throttle graph updates for better performance
+      if (now - lastGraphUpdate < GRAPH_UPDATE_INTERVAL) {
+        return;
+      }
+      
+      lastGraphUpdate = now;
+      
+      const timestamp = new Date().toLocaleTimeString();
+      const formattedTime = timestamp;
+      
+      liveGraphChart.data.labels.push(formattedTime);
+      liveGraphChart.data.datasets[0].data.push(intensity);
+      
+      // Store frame number in the hidden dataset for tooltip access
+      if (!liveGraphChart.data.datasets[1]) {
+        liveGraphChart.data.datasets.push({
+          data: [],
+          hidden: true,
+          label: 'Frame Number'
+        });
+      }
+      liveGraphChart.data.datasets[1].data.push(frameNumber || 'N/A');
+      
+      // Keep only the last 20 data points for better performance
+      if (liveGraphChart.data.labels.length > 20) {
+        liveGraphChart.data.labels.shift();
+        liveGraphChart.data.datasets[0].data.shift();
+        liveGraphChart.data.datasets[1].data.shift();
+      }
+      
+      liveGraphChart.update('none');
+    }
   </script>
 </body>
 </html>
