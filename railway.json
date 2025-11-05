@@ -4,7 +4,7 @@
     "builder": "nixpacks"
   },
   "deploy": {
-    "startCommand": "gunicorn --config gunicorn_config.py wsgi:application",
+    "startCommand": "python run_production.py",
     "healthcheckPath": "/health",
     "healthcheckTimeout": 100,
     "restartPolicyType": "on_failure",
