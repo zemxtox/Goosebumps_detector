@@ -10,6 +10,9 @@ from datetime import datetime
 from typing import Dict, Tuple
 from queue import Queue, Full
 
+import eventlet
+eventlet.monkey_patch()
+
 import cv2
 import numpy as np
 from flask import Flask, render_template, request, jsonify
@@ -172,8 +175,8 @@ def calculate_goosebump_power(gray_roi: np.ndarray, pixel_size_mm: float = 0.25)
     gray_norm = (gray_roi - roi_mean) / roi_std
     
     # 2D FFT (grayscale only!) - use rfft2 for real input optimization
-    fft_2d = np.fft.rfft2(gray_norm)
-    fft_2d_shifted = np.fft.fftshift(fft_2d, axes=0)  # Only shift y-axis for rfft2
+    fft_2d = np.fft.fft2(gray_norm)
+    fft_2d_shifted = np.fft.fftshift(fft_2d)
     power_spectrum_2d = np.abs(fft_2d_shifted) ** 2
     
     # Angular averaging
@@ -259,10 +262,13 @@ def process_and_emit_frame(img_color, st, device_id, is_upload=False):
     Core frame processing with emit throttling and optimizations.
     """
     # Emit throttling - max 10 Hz per device
+    # --- only throttle the UI emit, not the compute ---
     now = time.time()
     if hasattr(st, "_last_emit_ts") and (now - st._last_emit_ts) < 0.10:
-        return
-    st._last_emit_ts = now
+     return
+st._last_emit_ts = now
+# --------------------------------------------------
+
     
     # Optional resize to max 480 on long side for performance
     h, w = img_color.shape[:2]
