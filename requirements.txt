@@ -10,3 +10,4 @@ gunicorn==21.2.0
 plotly==5.17.0
 dash==2.14.2
 pandas==2.1.4
+dnspython==2.2.1
