@@ -1029,6 +1029,26 @@
       const entry = buildCard(data.device_id);
       deviceLastActive.set(data.device_id, Date.now());
       
+      // Update live camera overlay if this is the active camera
+      if (data.device_id.startsWith('mobile-camera-') && videoInfoOverlay) {
+        const existingDetection = videoInfoOverlay.querySelector('.detection-badge');
+        if (data.detect && !existingDetection) {
+          const badge = document.createElement('div');
+          badge.className = 'detection-badge';
+          badge.textContent = `🎯 Goosebumps! ${data.goosebump_intensity.toFixed(1)}%`;
+          videoInfoOverlay.appendChild(badge);
+        } else if (!data.detect && existingDetection) {
+          existingDetection.remove();
+        } else if (data.detect && existingDetection) {
+          existingDetection.textContent = `🎯 Goosebumps! ${data.goosebump_intensity.toFixed(1)}%`;
+        }
+        
+        // Update live graph for camera feed
+        if (data.baseline_established) {
+          updateLiveGraph(data.goosebump_intensity);
+        }
+      }
+      
       entry.root.style.display = 'flex';
       const statusIndicator = entry.root.querySelector('.status-indicator');
       if (statusIndicator) {
@@ -1357,58 +1377,37 @@
               return;
             }
             
+            frameCount++;
+            
+            // Convert blob to ArrayBuffer for binary Socket.IO transport
             const reader = new FileReader();
             reader.onloadend = () => {
-              if (!reader.result) {
-                isProcessing = false;
-                scheduleNextFrame();
-                return;
-              }
+              const arrayBuf = reader.result; // ArrayBuffer
               
-              const base64data = reader.result.split(',')[1];
-              frameCount++;
+              // Send binary data via Socket.IO for real-time performance
+              socket.emit('frame_jpeg', 
+                { device_id: cameraDeviceId, frame_number: frameCount }, 
+                arrayBuf
+              );
               
-              fetch('/upload_frame', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                  device_id: cameraDeviceId,
-                  jpg_b64: base64data,
-                  frame_number: frameCount
-                })
-              })
-              .then(response => response.json())
-              .then(data => {
-                deviceLastActive.set(cameraDeviceId, Date.now());
-                
-                if (data.intensity !== undefined && data.status !== 'skipped') {
-                  updateLiveGraph(data.intensity);
-                  
-                  const existingDetection = videoInfoOverlay.querySelector('.detection-badge');
-                  if (data.detect && !existingDetection) {
-                    const badge = document.createElement('div');
-                    badge.className = 'detection-badge';
-                    badge.textContent = `🎯 Goosebumps! ${data.intensity.toFixed(1)}%`;
-                    videoInfoOverlay.appendChild(badge);
-                  } else if (!data.detect && existingDetection) {
-                    existingDetection.remove();
-                  } else if (data.detect && existingDetection) {
-                    existingDetection.textContent = `🎯 Goosebumps! ${data.intensity.toFixed(1)}%`;
-                  }
-                }
-                
-                isProcessing = false;
-                scheduleNextFrame();
-              })
-              .catch(err => {
-                console.error('Frame send error:', err);
-                isProcessing = false;
-                scheduleNextFrame();
-              });
+              // Update device activity
+              deviceLastActive.set(cameraDeviceId, Date.now());
+              
+              // Note: Actual detection results will come via socket 'frame' event
+              // This provides much lower latency than HTTP requests
+              
+              isProcessing = false;
+              scheduleNextFrame();
             };
             
-            reader.readAsDataURL(blob);
-          }, 'image/jpeg', 0.7);
+            reader.onerror = () => {
+              console.error('Error reading blob data');
+              isProcessing = false;
+              scheduleNextFrame();
+            };
+            
+            reader.readAsArrayBuffer(blob); // Read as ArrayBuffer for binary transport
+          }, 'image/jpeg', 0.6); // Optimized quality for real-time
         } catch (err) {
           console.error('Frame capture error:', err);
           isProcessing = false;
