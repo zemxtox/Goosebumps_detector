@@ -697,7 +697,7 @@ if __name__ == "__main__":
         try:
             import eventlet
             print(" 🔧 Using Eventlet server (recommended for SocketIO)")
-            socketio.run(app, host=HOST, pT, port=PORT, debug=False, 
+            socketio.run(app, host=HOST, port=PORT, debug=False, 
                             allow_unsafe_werkzeug=True, 
                             server='gevent')
             except ImportError:
@@ -709,4 +709,5 @@ if __name__ == "__main__":
         # Development server
         print(f" 🏠 Starting development server on {HOST}:{PORT}")
         socketio.run(app, host=HOST, port=PORT, debug=True)
+
 
