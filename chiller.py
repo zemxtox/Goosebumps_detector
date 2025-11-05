@@ -682,7 +682,31 @@ if __name__ == "__main__":
     start_background_tasks()
     
     # Run the server
-    # In production environments like Railway, we need to ensure the server is accessible
-
-    socketio.run(app, host=HOST, port=PORT, debug=False)
+    # Check if we're in production (Railway) or development
+    railway_url = os.environ.get('RAILWAY_STATIC_URL')
+    is_production = railway_url is not None or os.environ.get('RAILWAY_ENVIRONMENT') is not None
+    
+    if is_production:
+        # Production deployment - use eventlet or gevent
+        print(f" 🚀 Starting production server on {HOST}:{PORT}")
+        try:
+            # Try eventlet first
+            socketio.run(app, host=HOST, port=PORT, debug=False, 
+                        allow_unsafe_werkzeug=True, 
+                        server='eventlet')
+        except ImportError:
+            try:
+                # Fallback to gevent
+                socketio.run(app, host=HOST, port=PORT, debug=False, 
+                            allow_unsafe_werkzeug=True, 
+                            server='gevent')
+            except ImportError:
+                # Last resort - allow unsafe werkzeug for production
+                print(" ⚠️ Using Werkzeug in production (not recommended)")
+                socketio.run(app, host=HOST, port=PORT, debug=False, 
+                            allow_unsafe_werkzeug=True)
+    else:
+        # Development server
+        print(f" 🏠 Starting development server on {HOST}:{PORT}")
+        socketio.run(app, host=HOST, port=PORT, debug=True)
 
