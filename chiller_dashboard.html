@@ -576,6 +576,15 @@
         transition-duration: 0.01ms !important;
       }
     }
+    
+    .custom-tooltip {
+      background: rgba(0, 0, 0, 0.8);
+      border: 1px solid #ff0000;
+      border-radius: 4px;
+      padding: 8px;
+      color: white;
+      font-size: 12px;
+    }
   </style>
 </head>
 <body>
@@ -618,7 +627,10 @@
     </div>
     
     <div class="live-graph-container" id="liveGraphContainer">
-      <div class="graph-title">📊 Live Intensity Graph</div>
+      <div class="graph-title">
+        📊 Live Intensity Graph
+        <button id="scaleToggle" class="sm-btn" style="margin-left: 1rem;">Auto Scale</button>
+      </div>
       <div id="liveGraph"></div>
     </div>
     
@@ -767,8 +779,14 @@
         toolbar: { show: false },
         zoom: { enabled: false }
       },
-      stroke: { curve: 'straight', width: 2 },
-      markers: { size: 0 },
+      stroke: { curve: 'straight', width: 3 },
+      markers: { 
+        size: 4,
+        colors: ['#ff0000'],
+        strokeColors: '#fff',
+        strokeWidth: 1,
+        hover: { size: 6 }
+      },
       fill: { type: 'solid', opacity: 0 },
       dataLabels: { enabled: false },
       xaxis: {
@@ -785,8 +803,30 @@
         labels: { style: { colors: '#fff' } }
       },
       grid: { borderColor: 'rgba(255,255,255,0.1)', strokeDashArray: 3 },
-      tooltip: { theme: 'dark' },
+      tooltip: { 
+        theme: 'dark',
+        custom: function({series, seriesIndex, dataPointIndex, w}) {
+          const value = series[seriesIndex][dataPointIndex];
+          const frame = w.globals.categoryLabels[dataPointIndex] || w.globals.labels[dataPointIndex];
+          return `<div class="custom-tooltip">
+            <strong>Frame:</strong> ${frame}<br>
+            <strong>Intensity:</strong> ${value.toFixed(1)}%
+          </div>`;
+        }
+      },
       colors: ['#ff0000'],
+      plotOptions: {
+        line: {
+          dropShadow: {
+            enabled: true,
+            color: '#ff0000',
+            top: 0,
+            left: 0,
+            blur: 3,
+            opacity: 0.5
+          }
+        }
+      },
       theme: { mode: 'dark' }
     };
 
@@ -1134,6 +1174,29 @@
       .then(d => updateDeviceList(d.devices || []))
       .catch(console.error);
     
+    // Scale toggle functionality
+    document.getElementById('scaleToggle').addEventListener('click', () => {
+      autoScale = !autoScale;
+      const button = document.getElementById('scaleToggle');
+      button.textContent = autoScale ? 'Fixed Scale' : 'Auto Scale';
+      
+      if (autoScale) {
+        // Apply auto-scaling
+        if (liveGraphData.length > 0) {
+          const maxValue = Math.max(...liveGraphData.map(point => point[1]));
+          const yMax = Math.max(50, Math.ceil(maxValue * 1.2 / 10) * 10);
+          liveChart.updateOptions({
+            yaxis: { min: 0, max: yMax }
+          });
+        }
+      } else {
+        // Reset to fixed scale
+        liveChart.updateOptions({
+          yaxis: { min: 0, max: 400 }
+        });
+      }
+    });
+    
     // Camera functionality
     const cameraBtn = document.getElementById('cameraBtn');
     const videoUpload = document.getElementById('videoUpload');
@@ -1477,10 +1540,20 @@
     
     // Store live graph data
     let liveGraphData = [];
+    let autoScale = false;
     
     function updateLiveGraph(intensity, frame) {
       try {
         console.log(`Updating live graph: Frame ${frame}, Intensity ${intensity}`);
+        
+        // Visual feedback - briefly highlight the graph title
+        const graphTitle = document.querySelector('.graph-title');
+        if (graphTitle) {
+          graphTitle.style.color = '#ff0000';
+          setTimeout(() => {
+            graphTitle.style.color = 'var(--lionsmane)';
+          }, 200);
+        }
         
         // Add new data point
         liveGraphData.push([frame, intensity]);
@@ -1495,6 +1568,15 @@
           name: 'Goosebump intensity',
           data: liveGraphData
         }]);
+        
+        // Auto-scale Y-axis if enabled
+        if (autoScale && liveGraphData.length > 0) {
+          const maxValue = Math.max(...liveGraphData.map(point => point[1]));
+          const yMax = Math.max(50, Math.ceil(maxValue * 1.2 / 10) * 10); // Round up to nearest 10
+          liveChart.updateOptions({
+            yaxis: { min: 0, max: yMax }
+          });
+        }
         
       } catch (error) {
         console.error('Live graph update error:', error);
