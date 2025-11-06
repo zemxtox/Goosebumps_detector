@@ -213,29 +213,31 @@ def enhance_skin_image(gray: np.ndarray) -> np.ndarray:
     return clahe.apply(gray)
 
 def fast_prepare_roi(img_color, st):
-    """Fast ROI preparation - only process ROI area with CLAHE."""
+    """Fast ROI preparation - always center ROI for consistent detection."""
     h, w = img_color.shape[:2]
     
-    # Small preview for ROI picking (320px wide)
-    pick_w = 320
-    pick_h = max(1, int(h * (pick_w / max(1, w))))
-    img_small = cv2.resize(img_color, (pick_w, pick_h), interpolation=cv2.INTER_AREA)
-    gray_small = cv2.cvtColor(img_small, cv2.COLOR_BGR2GRAY)
+    # Always center the ROI for consistent detection
+    st.roi_x = max(0, min((w - ROI_WIDTH) // 2, w - ROI_WIDTH))
+    st.roi_y = max(0, min((h - ROI_HEIGHT) // 2, h - ROI_HEIGHT))
     
-    # Reuse previous ROI if valid, otherwise center-biased
-    roi_x_small, roi_y_small = auto_select_roi(gray_small, 
-                                               int(st.roi_x * pick_w / w) if w > 0 else 0,
-                                               int(st.roi_y * pick_h / h) if h > 0 else 0)
-    
-    # Map back to full image coordinates
-    scale_x = w / pick_w
-    scale_y = h / pick_h
-    st.roi_x = max(0, min(int(roi_x_small * scale_x), w - ROI_WIDTH))
-    st.roi_y = max(0, min(int(roi_y_small * scale_y), h - ROI_HEIGHT))
+    # Debug: Print ROI position for first few frames
+    if st.frame_count <= 3:
+        print(f"[DEBUG] Frame {st.frame_count}: Image {w}x{h}, ROI at ({st.roi_x}, {st.roi_y}) size {ROI_WIDTH}x{ROI_HEIGHT}")
     
     # Crop ROI from full grayscale and apply CLAHE only on ROI
     gray_full = cv2.cvtColor(img_color, cv2.COLOR_BGR2GRAY)
-    roi = gray_full[st.roi_y:st.roi_y+ROI_HEIGHT, st.roi_x:st.roi_x+ROI_WIDTH]
+    
+    # Ensure we don't go out of bounds
+    roi_x_end = min(st.roi_x + ROI_WIDTH, w)
+    roi_y_end = min(st.roi_y + ROI_HEIGHT, h)
+    roi_w_actual = roi_x_end - st.roi_x
+    roi_h_actual = roi_y_end - st.roi_y
+    
+    roi = gray_full[st.roi_y:roi_y_end, st.roi_x:roi_x_end]
+    
+    # Resize to standard ROI size if needed
+    if roi.shape != (ROI_HEIGHT, ROI_WIDTH):
+        roi = cv2.resize(roi, (ROI_WIDTH, ROI_HEIGHT), interpolation=cv2.INTER_AREA)
     
     # Only apply CLAHE to the small ROI area
     clahe = cv2.createCLAHE(clipLimit=CLAHE_CLIP, tileGridSize=(8, 8))
@@ -246,15 +248,15 @@ def fast_prepare_roi(img_color, st):
 def auto_select_roi(gray: np.ndarray, prev_x: int = 0, prev_y: int = 0) -> Tuple[int, int]:
     """Select ROI (center-biased) - uses grayscale for consistency."""
     h, w = gray.shape
+    
+    # Always center the ROI for consistent detection
     x = (w - ROI_WIDTH) // 2
     y = (h - ROI_HEIGHT) // 2
     
-    if prev_x > 0 and prev_y > 0:
-        if prev_x + ROI_WIDTH <= w and prev_y + ROI_HEIGHT <= h:
-            return prev_x, prev_y
-    
+    # Ensure ROI stays within image bounds
     x = max(0, min(x, w - ROI_WIDTH))
     y = max(0, min(y, h - ROI_HEIGHT))
+    
     return x, y
 
 # -------------------- Real-time Processing Core --------------------
