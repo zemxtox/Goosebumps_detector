@@ -881,6 +881,7 @@
         overlay,
         stats: { baseline: s1, power: s2, detect: s3, frames: s4 },
         chart,
+        chartData: [], // Initialize chart data array
         detections: []
       };
       
@@ -987,6 +988,8 @@
     
     // Incoming frames
     socket.on('frame', (data) => {
+      console.log('Received frame data:', data.device_id, 'Frame:', data.frame_number, 'Intensity:', data.goosebump_intensity, 'Baseline:', data.baseline_established);
+      
       if (!(selectedDevice === '__all__' || data.device_id === selectedDevice)) return;
       
       const entry = buildCard(data.device_id);
@@ -1006,10 +1009,7 @@
           existingDetection.textContent = `🎯 Goosebumps! ${data.goosebump_intensity.toFixed(1)}%`;
         }
         
-        // Update live graph for camera feed
-        if (data.baseline_established) {
-          updateLiveGraph(data.goosebump_intensity, data.frame_number);
-        }
+        // This section is only for camera overlay updates
 
       }
       
@@ -1047,24 +1047,30 @@
       
       // Update chart with frame-based data
       if (data.baseline_established) {
-        entry.chart.appendData([{ data: [[data.frame_number, data.goosebump_intensity]] }]);
-
+        // Add new data point to device chart
+        if (!entry.chartData) entry.chartData = [];
+        entry.chartData.push([data.frame_number, data.goosebump_intensity]);
+        
         // Keep only last 250 points for performance
-        const series = entry.chart.w.config.series[0].data;
-        if (series.length > 250) {
-          series.splice(0, series.length - 250);
-          entry.chart.updateSeries([{ data: series }], false);
+        if (entry.chartData.length > 250) {
+          entry.chartData = entry.chartData.slice(-250);
         }
         
-        // Also update live graph if this device is selected or showing all devices
-        if (selectedDevice === '__all__' || selectedDevice === data.device_id) {
-          // Show live graph container if not already visible
-          const liveGraphContainer = document.getElementById('liveGraphContainer');
-          if (liveGraphContainer && !liveGraphContainer.classList.contains('active')) {
-            liveGraphContainer.classList.add('active');
-          }
-          updateLiveGraph(data.goosebump_intensity, data.frame_number);
+        // Update the chart
+        entry.chart.updateSeries([{
+          name: 'Goosebump intensity',
+          data: entry.chartData
+        }]);
+        
+      }
+      
+      // Update live graph for all baseline-established data
+      if (data.baseline_established) {
+        const liveGraphContainer = document.getElementById('liveGraphContainer');
+        if (liveGraphContainer && !liveGraphContainer.classList.contains('active')) {
+          liveGraphContainer.classList.add('active');
         }
+        updateLiveGraph(data.goosebump_intensity, data.frame_number);
       }
 
       
@@ -1297,7 +1303,9 @@
       videoContainer.classList.remove('active');
       liveGraphContainer.classList.remove('active');
       
-      liveChart.updateSeries([{ data: [] }]);
+      // Clear live graph data
+      liveGraphData = [];
+      liveChart.updateSeries([{ name: 'Goosebump intensity', data: [] }]);
     }
     
     function startProcessingCameraFrames() {
@@ -1467,15 +1475,27 @@
     let lastGraphUpdate = 0;
     const GRAPH_UPDATE_INTERVAL = 1000;
     
+    // Store live graph data
+    let liveGraphData = [];
+    
     function updateLiveGraph(intensity, frame) {
       try {
         console.log(`Updating live graph: Frame ${frame}, Intensity ${intensity}`);
-        liveChart.appendData([{ data: [[frame, intensity]] }]);
-        const series = liveChart.w.config.series[0].data;
-        if (series.length > 250) {
-          series.splice(0, series.length - 250);
-          liveChart.updateSeries([{ data: series }], false);
+        
+        // Add new data point
+        liveGraphData.push([frame, intensity]);
+        
+        // Keep only last 250 points for performance
+        if (liveGraphData.length > 250) {
+          liveGraphData = liveGraphData.slice(-250);
         }
+        
+        // Update the chart with all data
+        liveChart.updateSeries([{
+          name: 'Goosebump intensity',
+          data: liveGraphData
+        }]);
+        
       } catch (error) {
         console.error('Live graph update error:', error);
       }
