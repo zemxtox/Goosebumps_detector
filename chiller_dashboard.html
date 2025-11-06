@@ -630,6 +630,8 @@
       <div class="graph-title">
         📊 Live Intensity Graph
         <button id="scaleToggle" class="sm-btn" style="margin-left: 1rem;">Auto Scale</button>
+        <button id="smoothToggle" class="sm-btn" style="margin-left: 0.5rem;">Smooth</button>
+        <button id="debugToggle" class="sm-btn" style="margin-left: 0.5rem;">Debug</button>
       </div>
       <div id="liveGraph"></div>
     </div>
@@ -759,61 +761,38 @@
     const INACTIVE_THRESHOLD = 60000;
     
     const chartOptions = {
-      chart: {
-        type: 'line',
-        height: 220,
-        background: 'transparent',
-        animations: { enabled: true, easing: 'linear', dynamicAnimation: { speed: 400 } },
-        toolbar: { show: false },
-        zoom: { enabled: false }
-      },
-      stroke: { curve: 'straight', width: 3 },
-      markers: { 
-        size: 4,
-        colors: ['#ff0000'],
-        strokeColors: '#fff',
-        strokeWidth: 1,
-        hover: { size: 6 }
-      },
-      fill: { type: 'solid', opacity: 0 },
-      dataLabels: { enabled: false },
-      xaxis: {
-        type: 'numeric',
-        title: { text: 'Frame', style: { color: '#fff', fontWeight: 700 }},
-        labels: { style: { colors: '#fff' } },
-        axisBorder: { color: 'rgba(255,255,255,0.2)' },
-        axisTicks: { color: 'rgba(255,255,255,0.2)' }
-      },
-      yaxis: {
-        min: 0,
-        max: 400,
-        title: { text: 'Goosebump intensity', style: { color: '#fff', fontWeight: 700 }},
-        labels: { style: { colors: '#fff' } }
-      },
-      grid: { borderColor: 'rgba(255,255,255,0.1)', strokeDashArray: 3 },
-      tooltip: { 
-        theme: 'dark',
-        custom: function({series, seriesIndex, dataPointIndex, w}) {
-          const value = series[seriesIndex][dataPointIndex];
-          const frame = w.globals.categoryLabels[dataPointIndex] || w.globals.labels[dataPointIndex];
-          return '<div class="custom-tooltip"><strong>Frame:</strong> ' + frame + '<br><strong>Intensity:</strong> ' + value.toFixed(1) + '%</div>';
-        }
-      },
-      colors: ['#ff0000'],
-      plotOptions: {
-        line: {
-          dropShadow: {
-            enabled: true,
-            color: '#ff0000',
-            top: 0,
-            left: 0,
-            blur: 3,
-            opacity: 0.5
-          }
-        }
-      },
-      theme: { mode: 'dark' }
-    };
+    chart: {
+    type: 'line',
+    height: 220,
+    background: 'transparent',
+    animations: { enabled: true, easing: 'linear', dynamicAnimation: { speed: 400 } },
+    toolbar: { show: false },
+    zoom: { enabled: false }
+  },
+  stroke: { curve: 'straight', width: 2 },
+  markers: { size: 0 },                 // ⬅️ no dots
+  dataLabels: { enabled: false },
+  fill: { type: 'solid', opacity: 0 },  // no area
+  xaxis: {
+    type: 'numeric',
+    decimalsInFloat: 0,
+    title: { text: 'Frame', style: { color: '#fff', fontWeight: 700 }},
+    labels: { style: { colors: '#fff' } },
+    axisBorder: { color: 'rgba(255,255,255,0.2)' },
+    axisTicks: { color: 'rgba(255,255,255,0.2)' }
+  },
+  yaxis: {
+    min: 0,
+    max: 400, // fixed scale like the figure
+    title: { text: 'Goosebump intensity', style: { color: '#fff', fontWeight: 700 }},
+    labels: { style: { colors: '#fff' } }
+  },
+  grid: { borderColor: 'rgba(255,255,255,0.1)', strokeDashArray: 3 },
+  tooltip: { theme: 'dark' },
+  colors: ['#ff0000'],
+  theme: { mode: 'dark' }
+};
+
 
     const liveGraphOptions = { ...chartOptions, chart: { ...chartOptions.chart, id: 'live-graph', height: 300 } };
     const liveChart = new ApexCharts(document.getElementById('liveGraph'), {
@@ -883,7 +862,8 @@
         stats: { baseline: s1, power: s2, detect: s3, frames: s4 },
         chart: chart,
         chartData: [],
-        detections: []
+        detections: [],
+        _lastFrame: 0 // Track last frame for monotonic ordering
       };
       deviceCards.set(id, entry);
       return entry;
@@ -1025,14 +1005,23 @@
       entry.stats.power.set(data.current_power.toFixed(2));
       entry.stats.baseline.set(data.baseline_established ? data.baseline_power.toFixed(2) : '...');
       if (data.baseline_established) {
-        entry.chartData.push({ x: data.frame_number, y: data.goosebump_intensity });
-        if (entry.chartData.length > 250) {
-          entry.chartData = entry.chartData.slice(-250);
+        // Ensure monotonic frame ordering per device
+        if (entry._lastFrame && data.frame_number <= entry._lastFrame) {
+          console.log('Skipping out-of-order frame for device', data.device_id, ':', data.frame_number, 'last:', entry._lastFrame);
+          return;
         }
-        entry.chart.updateSeries([{
-          name: 'Goosebump intensity',
-          data: entry.chartData
-        }], true);
+        entry._lastFrame = data.frame_number;
+        
+        // Use appendData for better performance
+        entry.chart.appendData([{ data: [[data.frame_number, data.goosebump_intensity]] }]);
+        
+        // Keep only last 250 points
+        const series = entry.chart.w.config.series[0].data;
+        if (series.length > 250) {
+          series.splice(0, series.length - 250);
+          entry.chart.updateSeries([{ data: series }], false);
+        }
+        
         const liveGraphContainer = document.getElementById('liveGraphContainer');
         if (liveGraphContainer && !liveGraphContainer.classList.contains('active')) {
           liveGraphContainer.classList.add('active');
@@ -1089,10 +1078,35 @@
     
     let liveGraphData = [];
     let autoScale = false;
+    let smoothing = false;
+    let lastLiveFrame = 0; // Track last frame for monotonic ordering
+    
+    // Optional smoothing function (visual only)
+    function smoothY(series, k = 3) {
+      if (series.length < k) return series;
+      const half = Math.floor(k / 2);
+      const out = series.map((p, i) => {
+        const start = Math.max(0, i - half);
+        const end = Math.min(series.length, i + half + 1);
+        const window = series.slice(start, end).map(q => q[1]);
+        window.sort((a, b) => a - b);
+        return [p[0], window[Math.floor(window.length / 2)]];
+      });
+      return out;
+    }
     
     function updateLiveGraph(intensity, frame) {
       try {
         console.log('Updating live graph: Frame ' + frame + ', Intensity ' + intensity);
+        
+        // Ensure monotonic frame ordering
+        if (frame <= lastLiveFrame) {
+          console.log('Skipping out-of-order frame:', frame, 'last:', lastLiveFrame);
+          return;
+        }
+        lastLiveFrame = frame;
+        
+        // Visual feedback - briefly highlight the graph title
         const graphTitle = document.querySelector('.graph-title');
         if (graphTitle) {
           graphTitle.style.color = '#ff0000';
@@ -1100,21 +1114,32 @@
             graphTitle.style.color = 'var(--lionsmane)';
           }, 200);
         }
-        liveGraphData.push({ x: frame, y: intensity });
-        if (liveGraphData.length > 250) {
-          liveGraphData = liveGraphData.slice(-250);
+        
+        // Use appendData for better performance
+        liveChart.appendData([{ data: [[frame, intensity]] }]);
+        
+        // Keep only last 250 points and apply smoothing if enabled
+        const series = liveChart.w.config.series[0].data;
+        if (series.length > 250) {
+          series.splice(0, series.length - 250);
+          liveChart.updateSeries([{ data: series }], false);
         }
-        liveChart.updateSeries([{
-          name: 'Goosebump intensity',
-          data: liveGraphData
-        }], true);
-        if (autoScale && liveGraphData.length > 0) {
-          const maxValue = Math.max(...liveGraphData.map(point => point.y));
+        
+        // Apply smoothing if enabled (every 10 points for performance)
+        if (smoothing && series.length > 0 && series.length % 10 === 0) {
+          const smoothedData = smoothY(series, 3);
+          liveChart.updateSeries([{ data: smoothedData }], false);
+        }
+        
+        // Auto-scale Y-axis if enabled
+        if (autoScale && series.length > 0) {
+          const maxValue = Math.max(...series.map(point => point[1]));
           const yMax = Math.max(50, Math.ceil(maxValue * 1.2 / 10) * 10);
           liveChart.updateOptions({
             yaxis: { min: 0, max: yMax }
           }, false, true);
         }
+        
       } catch (error) {
         console.error('Live graph update error:', error);
       }
@@ -1124,19 +1149,63 @@
       autoScale = !autoScale;
       const button = document.getElementById('scaleToggle');
       button.textContent = autoScale ? 'Fixed Scale' : 'Auto Scale';
+      
       if (autoScale) {
-        if (liveGraphData.length > 0) {
-          const maxValue = Math.max(...liveGraphData.map(point => point.y));
+        // Apply auto-scaling based on current data
+        const series = liveChart.w.config.series[0].data;
+        if (series && series.length > 0) {
+          const maxValue = Math.max(...series.map(point => point[1]));
           const yMax = Math.max(50, Math.ceil(maxValue * 1.2 / 10) * 10);
           liveChart.updateOptions({
             yaxis: { min: 0, max: yMax }
           }, false, true);
         }
       } else {
+        // Reset to fixed scale
         liveChart.updateOptions({
           yaxis: { min: 0, max: 400 }
         }, false, true);
       }
+    });
+    
+    // Smooth toggle functionality
+    document.getElementById('smoothToggle').addEventListener('click', () => {
+      smoothing = !smoothing;
+      const button = document.getElementById('smoothToggle');
+      button.textContent = smoothing ? 'Raw Data' : 'Smooth';
+      
+      if (smoothing) {
+        // Apply smoothing to current data
+        const series = liveChart.w.config.series[0].data;
+        if (series && series.length > 0) {
+          const smoothedData = smoothY(series, 3);
+          liveChart.updateSeries([{ data: smoothedData }], false);
+        }
+      } else {
+        // Note: Raw data will be restored as new points come in
+        console.log('Smoothing disabled - raw data will show with new points');
+      }
+    });
+    
+    // Debug toggle functionality
+    document.getElementById('debugToggle').addEventListener('click', () => {
+      const series = liveChart.w.config.series[0].data;
+      console.log('=== LIVE GRAPH DEBUG ===');
+      console.log('Data points:', series ? series.length : 0);
+      console.log('Last frame:', lastLiveFrame);
+      console.log('Auto scale:', autoScale);
+      console.log('Smoothing:', smoothing);
+      if (series && series.length > 0) {
+        console.log('First point:', series[0]);
+        console.log('Last point:', series[series.length - 1]);
+        console.log('Value range:', Math.min(...series.map(p => p[1])), 'to', Math.max(...series.map(p => p[1])));
+      }
+      console.log('Device cards:', deviceCards.size);
+      deviceCards.forEach((entry, id) => {
+        const deviceSeries = entry.chart.w.config.series[0].data;
+        console.log(`Device ${id}: ${deviceSeries ? deviceSeries.length : 0} points, last frame: ${entry._lastFrame}`);
+      });
+      console.log('========================');
     });
     
     const cameraBtn = document.getElementById('cameraBtn');
@@ -1283,6 +1352,7 @@
       videoContainer.classList.remove('active');
       liveGraphContainer.classList.remove('active');
       liveGraphData = [];
+      lastLiveFrame = 0; // Reset frame counter
       liveChart.updateSeries([{ name: 'Goosebump intensity', data: [] }]);
     }
     
