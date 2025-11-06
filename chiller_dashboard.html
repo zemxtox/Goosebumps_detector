@@ -757,50 +757,47 @@
     const deviceLastActive = new Map();
     const INACTIVE_THRESHOLD = 60000;
     
-    // ApexCharts configuration
+    // ApexCharts configuration - matching research figure
     const chartOptions = {
-    chart: {
-    type: 'line',
-    height: 220,
-    background: 'transparent',
-    animations: { enabled: true, easing: 'linear', dynamicAnimation: { speed: 400 } },
-    toolbar: { show: false },
-    zoom: { enabled: false }
-  },
-  stroke: { curve: 'straight', width: 2 },   // clean red line
-  markers: { size: 0 },
-  fill: { type: 'solid', opacity: 0 },       // no area fill
-  dataLabels: { enabled: false },
-  xaxis: {
-    type: 'numeric',
-    title: { text: 'Frame', style: { color: '#fff', fontWeight: 700 }},
-    labels: { style: { colors: '#fff' } },
-    axisBorder: { color: 'rgba(255,255,255,0.2)' },
-    axisTicks: { color: 'rgba(255,255,255,0.2)' }
-  },
-  yaxis: {
-  min: 0,
-  forceNiceScale: true,
-  decimalsInFloat: 0,
-  title: { text: 'Goosebump intensity', style: { color: '#fff', fontWeight: 700 }},
-  labels: { style: { colors: '#fff' } }
-},
+      chart: {
+        type: 'line',
+        height: 220,
+        background: 'transparent',
+        animations: { enabled: true, easing: 'linear', dynamicAnimation: { speed: 400 } },
+        toolbar: { show: false },
+        zoom: { enabled: false }
+      },
+      stroke: { curve: 'straight', width: 2 },
+      markers: { size: 0 },
+      fill: { type: 'solid', opacity: 0 },
+      dataLabels: { enabled: false },
+      xaxis: {
+        type: 'numeric',
+        title: { text: 'Frame', style: { color: '#fff', fontWeight: 700 }},
+        labels: { style: { colors: '#fff' } },
+        axisBorder: { color: 'rgba(255,255,255,0.2)' },
+        axisTicks: { color: 'rgba(255,255,255,0.2)' }
+      },
+      yaxis: {
+        min: 0,
+        max: 400,
+        title: { text: 'Goosebump intensity', style: { color: '#fff', fontWeight: 700 }},
+        labels: { style: { colors: '#fff' } }
+      },
+      grid: { borderColor: 'rgba(255,255,255,0.1)', strokeDashArray: 3 },
+      tooltip: { theme: 'dark' },
+      colors: ['#ff0000'],
+      theme: { mode: 'dark' }
+    };
 
-  grid: { borderColor: 'rgba(255,255,255,0.1)', strokeDashArray: 3 },
-  tooltip: { theme: 'dark' },
-  // red line color
-  colors: ['#ff0000'],
-  theme: { mode: 'dark' }
-};
+    const liveGraphOptions = { ...chartOptions, chart: { ...chartOptions.chart, id: 'live-graph', height: 300 } };
 
-  const liveGraphOptions = { ...chartOptions, chart: { ...chartOptions.chart, id: 'live-graph', height: 300 } };
-
-  const chart = new ApexCharts(chartWrap, {
-  ...chartOptions,
-  series: [{ name: 'Goosebump intensity', data: [] }]
-});
-
-  liveChart.render();
+    // Initialize live chart
+    const liveChart = new ApexCharts(document.getElementById('liveGraph'), {
+      ...liveGraphOptions,
+      series: [{ name: 'Goosebump intensity', data: [] }]
+    });
+    liveChart.render();
 
     
     function buildCard(id) {
@@ -870,10 +867,11 @@
       card.append(header, feed, stats, chartWrap);
       grid.appendChild(card);
       
-      // Create ApexChart
-      const chart = new ApexCharts(chartWrap, {
+      // Create ApexChart - fix the chartWrap reference bug
+      const chartEl = document.getElementById(`chart-${id}`);
+      const chart = new ApexCharts(chartEl, {
         ...chartOptions,
-        series: [{ name: 'Intensity', data: [] }]
+        series: [{ name: 'Goosebump intensity', data: [] }]
       });
       chart.render();
       
@@ -1047,17 +1045,17 @@
       entry.stats.power.set(data.current_power.toFixed(2));
       entry.stats.baseline.set(data.baseline_established ? data.baseline_power.toFixed(2) : '...');
       
-      // Update chart
+      // Update chart with frame-based data
       if (data.baseline_established) {
-      entry.chart.appendData([{ data: [[data.frame_number, data.goosebump_intensity]] }]);
+        entry.chart.appendData([{ data: [[data.frame_number, data.goosebump_intensity]] }]);
 
-  // Keep only last 250 points (or whatever you prefer)
-      const series = entry.chart.w.config.series[0].data;
-      if (series.length > 250) {
-      series.splice(0, series.length - 250);
-      entry.chart.updateSeries([{ data: series }], false);
-  }
-}
+        // Keep only last 250 points for performance
+        const series = entry.chart.w.config.series[0].data;
+        if (series.length > 250) {
+          series.splice(0, series.length - 250);
+          entry.chart.updateSeries([{ data: series }], false);
+        }
+      }
 
       
       // Track detections
@@ -1465,8 +1463,8 @@
       if (series.length > 250) {
         series.splice(0, series.length - 250);
         liveChart.updateSeries([{ data: series }], false);
-  }
-}
+      }
+    }
 
     
     // Connection handling
