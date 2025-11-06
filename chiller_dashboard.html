@@ -589,16 +589,16 @@
 </head>
 <body>
   <div id="offlineNotification" class="offline-notification">
-    ⚠️ You are currently offline. Some features may be limited.
+    ⚠ You are currently offline. Some features may be limited.
   </div>
   
   <div class="container">
     <div class="header">
-      <h1>❄️ Goosebumps Detector</h1>
+      <h1>❄ Goosebumps Detector</h1>
       <p>Real-time detection and analysis dashboard</p>
       <button id="installButton" class="install-button">📱 Install App</button>
       <div id="httpsWarning" class="https-warning" style="display: none;">
-        <p>⚠️ For full functionality (PWA + Camera), use HTTPS or localhost</p>
+        <p>⚠ For full functionality (PWA + Camera), use HTTPS or localhost</p>
         <p>Current: <span id="currentProtocol"></span></p>
       </div>
     </div>
@@ -636,7 +636,7 @@
     
     <div class="device-selector">
       <select id="deviceSelect">
-        <option value="__all__">All Active Devices</option>
+        <option value="all">All Active Devices</option>
       </select>
     </div>
     
@@ -649,7 +649,7 @@
     
     <div class="panel">
       <div class="panel-title">
-        <span>⚙️</span> Controls
+        <span>⚙</span> Controls
       </div>
       <div class="action-controls">
         <button class="btn btn-primary" id="resetBaseline">
@@ -663,28 +663,22 @@
   </div>
 
   <script>
-    // Protocol check
     (function checkProtocol() {
       const isSecure = window.isSecureContext;
       const protocol = window.location.protocol;
       const hostname = window.location.hostname;
-      
       const httpsWarning = document.getElementById('httpsWarning');
       const currentProtocol = document.getElementById('currentProtocol');
-      
       if (currentProtocol) {
-        currentProtocol.textContent = `${protocol}//${hostname}`;
+        currentProtocol.textContent = protocol + '//' + hostname;
       }
-      
       const isRailway = hostname.includes('railway.app');
       const isLocalhost = hostname === 'localhost' || hostname === '127.0.0.1';
-      
       if (!isSecure && !isLocalhost && !isRailway) {
         if (httpsWarning) httpsWarning.style.display = 'block';
       }
     })();
     
-    // PWA Setup
     let deferredPrompt = null;
     let isOnline = navigator.onLine;
     
@@ -731,11 +725,10 @@
             }
             return;
           }
-          
           try {
             await deferredPrompt.prompt();
             const { outcome } = await deferredPrompt.userChoice;
-            console.log(`Install prompt result: ${outcome}`);
+            console.log('Install prompt result: ' + outcome);
             deferredPrompt = null;
             installButton.style.display = 'none';
           } catch (error) {
@@ -744,9 +737,7 @@
         });
       }
       
-      // Online/offline handling
       const offlineNotification = document.getElementById('offlineNotification');
-      
       function updateOnlineStatus() {
         if (navigator.onLine) {
           if (offlineNotification) offlineNotification.style.display = 'none';
@@ -756,20 +747,17 @@
           document.body.classList.add('offline');
         }
       }
-      
       window.addEventListener('online', updateOnlineStatus);
       window.addEventListener('offline', updateOnlineStatus);
       updateOnlineStatus();
     }
     
-    // Socket.io connection
     const socket = io();
-    let selectedDevice = '__all__';
+    let selectedDevice = 'all';
     const deviceCards = new Map();
     const deviceLastActive = new Map();
     const INACTIVE_THRESHOLD = 60000;
     
-    // ApexCharts configuration - matching research figure
     const chartOptions = {
       chart: {
         type: 'line',
@@ -808,10 +796,7 @@
         custom: function({series, seriesIndex, dataPointIndex, w}) {
           const value = series[seriesIndex][dataPointIndex];
           const frame = w.globals.categoryLabels[dataPointIndex] || w.globals.labels[dataPointIndex];
-          return `<div class="custom-tooltip">
-            <strong>Frame:</strong> ${frame}<br>
-            <strong>Intensity:</strong> ${value.toFixed(1)}%
-          </div>`;
+          return '<div class="custom-tooltip"><strong>Frame:</strong> ' + frame + '<br><strong>Intensity:</strong> ' + value.toFixed(1) + '%</div>';
         }
       },
       colors: ['#ff0000'],
@@ -831,56 +816,40 @@
     };
 
     const liveGraphOptions = { ...chartOptions, chart: { ...chartOptions.chart, id: 'live-graph', height: 300 } };
-
-    // Initialize live chart
     const liveChart = new ApexCharts(document.getElementById('liveGraph'), {
       ...liveGraphOptions,
       series: [{ name: 'Goosebump intensity', data: [] }]
     });
     liveChart.render();
 
-    
     function buildCard(id) {
       if (deviceCards.has(id)) return deviceCards.get(id);
-      
       const grid = document.getElementById('cardsGrid');
       const card = document.createElement('div');
       card.className = 'device-card';
       card.dataset.device = id;
-      
-      // Header
       const header = document.createElement('div');
       header.className = 'device-card__header';
-      
       const titleContainer = document.createElement('div');
       titleContainer.className = 'device-card__title-container';
-      
       const title = document.createElement('div');
       title.className = 'device-card__title';
       title.textContent = id;
-      
       const statusIndicator = document.createElement('div');
       statusIndicator.className = 'status-indicator active';
-      
       titleContainer.append(title, statusIndicator);
-      
       const actions = document.createElement('div');
       actions.className = 'device-card__actions';
-      
       const btnReset = document.createElement('button');
       btnReset.className = 'sm-btn';
       btnReset.textContent = 'Reset';
       btnReset.onclick = () => perDeviceReset(id);
-      
       const btnCSV = document.createElement('button');
       btnCSV.className = 'sm-btn';
       btnCSV.textContent = 'Export';
       btnCSV.onclick = () => perDeviceExport(id);
-      
       actions.append(btnReset, btnCSV);
       header.append(titleContainer, actions);
-      
-      // Feed
       const feed = document.createElement('div');
       feed.className = 'device-card__feed';
       const img = document.createElement('img');
@@ -889,8 +858,6 @@
       overlay.className = 'feed-overlay monitor';
       overlay.textContent = 'Initializing...';
       feed.append(img, overlay);
-      
-      // Stats
       const stats = document.createElement('div');
       stats.className = 'device-card__stats';
       const s1 = statBox('Baseline');
@@ -898,33 +865,26 @@
       const s3 = statBox('Detects');
       const s4 = statBox('Frames');
       stats.append(s1.root, s2.root, s3.root, s4.root);
-      
-      // Chart
       const chartWrap = document.createElement('div');
       chartWrap.className = 'device-card__chart';
-      chartWrap.id = `chart-${id}`;
-      
+      chartWrap.id = 'chart-' + id;
       card.append(header, feed, stats, chartWrap);
       grid.appendChild(card);
-      
-      // Create ApexChart - fix the chartWrap reference bug
-      const chartEl = document.getElementById(`chart-${id}`);
+      const chartEl = document.getElementById('chart-' + id);
       const chart = new ApexCharts(chartEl, {
         ...chartOptions,
         series: [{ name: 'Goosebump intensity', data: [] }]
       });
       chart.render();
-      
       const entry = {
         root: card,
-        img,
-        overlay,
+        img: img,
+        overlay: overlay,
         stats: { baseline: s1, power: s2, detect: s3, frames: s4 },
-        chart,
-        chartData: [], // Initialize chart data array
+        chart: chart,
+        chartData: [],
         detections: []
       };
-      
       deviceCards.set(id, entry);
       return entry;
     }
@@ -939,20 +899,18 @@
       v.className = 'val';
       v.textContent = '--';
       root.append(l, v);
-      return { root, labelEl: l, valEl: v, set: (x) => v.textContent = x };
+      return { root: root, labelEl: l, valEl: v, set: (x) => v.textContent = x };
     }
     
     function applyFilter() {
       const grid = document.getElementById('cardsGrid');
       const select = document.getElementById('deviceSelect');
-      
       const activeDeviceIds = new Set();
       for (let i = 1; i < select.options.length; i++) {
         const value = select.options[i].value;
-        if (value !== '__all__') activeDeviceIds.add(value);
+        if (value !== 'all') activeDeviceIds.add(value);
       }
-      
-      if (selectedDevice === '__all__') {
+      if (selectedDevice === 'all') {
         deviceCards.forEach(({ root }, id) => {
           root.style.display = activeDeviceIds.has(id) ? 'flex' : 'none';
         });
@@ -965,8 +923,8 @@
     
     async function perDeviceReset(id) {
       try {
-        const r = await fetch(`/reset_baseline/${id}`, { method: 'POST' });
-        if (r.ok) alert(`✅ Baseline reset for ${id}`);
+        const r = await fetch('/reset_baseline/' + id, { method: 'POST' });
+        if (r.ok) alert('✅ Baseline reset for ' + id);
       } catch (e) {
         alert('❌ Error: ' + e.message);
       }
@@ -978,25 +936,22 @@
         alert('❌ No detections to export!');
         return;
       }
-      
-      const csv = 'Device,Time,Frame,Intensity\n' + 
-        entry.detections.map(d => `${id},${d.time},${d.frame},${d.intensity}`).join('\n');
+      const csv = 'Device,Time,Frame,Intensity\n' + entry.detections.map(d => id + ',' + d.time + ',' + d.frame + ',' + d.intensity).join('\n');
       const blob = new Blob([csv], { type: 'text/csv' });
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = `goosebumps_${id}_${Date.now()}.csv`;
+      a.download = 'goosebumps_' + id + '_' + Date.now() + '.csv';
       a.click();
       URL.revokeObjectURL(url);
     }
     
-    // Global controls
     document.getElementById('resetBaseline').onclick = async () => {
-      if (selectedDevice === '__all__') {
+      if (selectedDevice === 'all') {
         const ids = Array.from(deviceCards.keys());
         if (!ids.length) return;
         if (!confirm('Reset baseline for ALL devices?')) return;
-        await Promise.all(ids.map(id => fetch(`/reset_baseline/${id}`, { method: 'POST' })));
+        await Promise.all(ids.map(id => fetch('/reset_baseline/' + id, { method: 'POST' })));
         alert('✅ Baselines reset for all devices');
       } else {
         perDeviceReset(selectedDevice);
@@ -1004,10 +959,10 @@
     };
     
     document.getElementById('exportData').onclick = () => {
-      if (selectedDevice === '__all__') {
+      if (selectedDevice === 'all') {
         const rows = [];
         deviceCards.forEach((entry, id) => {
-          entry.detections.forEach(d => rows.push(`${id},${d.time},${d.frame},${d.intensity}`));
+          entry.detections.forEach(d => rows.push(id + ',' + d.time + ',' + d.frame + ',' + d.intensity));
         });
         if (!rows.length) {
           alert('❌ No detections to export!');
@@ -1018,7 +973,7 @@
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
         a.href = url;
-        a.download = `goosebumps_ALL_${Date.now()}.csv`;
+        a.download = 'goosebumps_ALL_' + Date.now() + '.csv';
         a.click();
         URL.revokeObjectURL(url);
       } else {
@@ -1026,95 +981,64 @@
       }
     };
     
-    // Incoming frames
     socket.on('frame', (data) => {
       console.log('Received frame data:', data.device_id, 'Frame:', data.frame_number, 'Intensity:', data.goosebump_intensity, 'Baseline:', data.baseline_established);
-      
-      if (!(selectedDevice === '__all__' || data.device_id === selectedDevice)) return;
-      
+      if (!(selectedDevice === 'all' || data.device_id === selectedDevice)) return;
       const entry = buildCard(data.device_id);
       deviceLastActive.set(data.device_id, Date.now());
-      
-      // Update live camera overlay if this is the active camera
       if (data.device_id.startsWith('mobile-camera-') && videoInfoOverlay) {
         const existingDetection = videoInfoOverlay.querySelector('.detection-badge');
         if (data.detect && !existingDetection) {
           const badge = document.createElement('div');
           badge.className = 'detection-badge';
-          badge.textContent = `🎯 Goosebumps! ${data.goosebump_intensity.toFixed(1)}%`;
+          badge.textContent = '🎯 Goosebumps! ' + data.goosebump_intensity.toFixed(1) + '%';
           videoInfoOverlay.appendChild(badge);
         } else if (!data.detect && existingDetection) {
           existingDetection.remove();
         } else if (data.detect && existingDetection) {
-          existingDetection.textContent = `🎯 Goosebumps! ${data.goosebump_intensity.toFixed(1)}%`;
+          existingDetection.textContent = '🎯 Goosebumps! ' + data.goosebump_intensity.toFixed(1) + '%';
         }
-        
-        // This section is only for camera overlay updates
-
       }
-      
       entry.root.style.display = 'flex';
       const statusIndicator = entry.root.querySelector('.status-indicator');
       if (statusIndicator) {
         statusIndicator.classList.remove('inactive');
         statusIndicator.classList.add('active');
       }
-      
-      // Update image
       try {
         entry.img.src = 'data:image/jpeg;base64,' + data.img;
       } catch (e) {
         console.error('Error updating image:', e);
       }
-      
-      // Update overlay
       if (!data.baseline_established) {
         entry.overlay.className = 'feed-overlay baseline';
-        entry.overlay.textContent = `Recording baseline (Frame: ${data.frame_number})`;
+        entry.overlay.textContent = 'Recording baseline (Frame: ' + data.frame_number + ')';
       } else if (data.detect) {
         entry.overlay.className = 'feed-overlay detect';
-        entry.overlay.textContent = `🎯 Goosebumps! ${data.goosebump_intensity.toFixed(1)}%`;
+        entry.overlay.textContent = '🎯 Goosebumps! ' + data.goosebump_intensity.toFixed(1) + '%';
       } else {
         entry.overlay.className = 'feed-overlay monitor';
-        entry.overlay.textContent = `Monitoring (Frame: ${data.frame_number})`;
+        entry.overlay.textContent = 'Monitoring (Frame: ' + data.frame_number + ')';
       }
-      
-      // Update stats
       entry.stats.frames.set(data.frame_number);
       entry.stats.detect.set(data.detection_count);
       entry.stats.power.set(data.current_power.toFixed(2));
       entry.stats.baseline.set(data.baseline_established ? data.baseline_power.toFixed(2) : '...');
-      
-      // Update chart with frame-based data
       if (data.baseline_established) {
-        // Add new data point to device chart
-        if (!entry.chartData) entry.chartData = [];
-        entry.chartData.push([data.frame_number, data.goosebump_intensity]);
-        
-        // Keep only last 250 points for performance
+        entry.chartData.push({ x: data.frame_number, y: data.goosebump_intensity });
         if (entry.chartData.length > 250) {
           entry.chartData = entry.chartData.slice(-250);
         }
-        
-        // Update the chart
         entry.chart.updateSeries([{
           name: 'Goosebump intensity',
           data: entry.chartData
-        }]);
-        
-      }
-      
-      // Update live graph for all baseline-established data
-      if (data.baseline_established) {
+        }], true);
         const liveGraphContainer = document.getElementById('liveGraphContainer');
         if (liveGraphContainer && !liveGraphContainer.classList.contains('active')) {
           liveGraphContainer.classList.add('active');
         }
         updateLiveGraph(data.goosebump_intensity, data.frame_number);
       }
-
-      
-      // Track detections
       if (data.detect) {
         entry.detections.push({
           time: data.timestamp,
@@ -1122,82 +1046,99 @@
           frame: data.frame_number
         });
       }
-      
       applyFilter();
     });
     
-    // Device list updates
     socket.on('devices', (msg) => updateDeviceList(msg.devices || []));
     
     function updateDeviceList(devices) {
       const select = document.getElementById('deviceSelect');
-      const current = select.value || '__all__';
-      select.innerHTML = '<option value="__all__">All Active Devices</option>';
-      
+      const current = select.value || 'all';
+      select.innerHTML = '<option value="all">All Active Devices</option>';
       const activeDeviceIds = new Set();
-      
       devices.forEach(dev => {
         const info = typeof dev === 'object' ? dev : { id: dev };
         const opt = document.createElement('option');
         opt.value = info.id;
-        opt.textContent = `${info.id} ${info.baseline_ready ? '✓' : '⏳'}`;
+        opt.textContent = info.id + ' ' + (info.baseline_ready ? '✓' : '⏳');
         select.appendChild(opt);
         buildCard(info.id);
         activeDeviceIds.add(info.id);
       });
-      
       deviceCards.forEach((entry, id) => {
         if (!activeDeviceIds.has(id)) {
           entry.root.style.display = 'none';
         }
       });
-      
-      if (current !== '__all__' && !activeDeviceIds.has(current)) {
-        select.value = '__all__';
-        selectedDevice = '__all__';
+      if (current !== 'all' && !activeDeviceIds.has(current)) {
+        select.value = 'all';
+        selectedDevice = 'all';
       } else {
         select.value = current;
         selectedDevice = current;
       }
-      
       applyFilter();
     }
     
     document.getElementById('deviceSelect').addEventListener('change', (e) => {
-      selectedDevice = e.target.value || '__all__';
+      selectedDevice = e.target.value || 'all';
       applyFilter();
     });
     
-    // Fetch initial devices
-    fetch('/devices')
-      .then(r => r.json())
-      .then(d => updateDeviceList(d.devices || []))
-      .catch(console.error);
+    fetch('/devices').then(r => r.json()).then(d => updateDeviceList(d.devices || [])).catch(console.error);
     
-    // Scale toggle functionality
+    let liveGraphData = [];
+    let autoScale = false;
+    
+    function updateLiveGraph(intensity, frame) {
+      try {
+        console.log('Updating live graph: Frame ' + frame + ', Intensity ' + intensity);
+        const graphTitle = document.querySelector('.graph-title');
+        if (graphTitle) {
+          graphTitle.style.color = '#ff0000';
+          setTimeout(() => {
+            graphTitle.style.color = 'var(--lionsmane)';
+          }, 200);
+        }
+        liveGraphData.push({ x: frame, y: intensity });
+        if (liveGraphData.length > 250) {
+          liveGraphData = liveGraphData.slice(-250);
+        }
+        liveChart.updateSeries([{
+          name: 'Goosebump intensity',
+          data: liveGraphData
+        }], true);
+        if (autoScale && liveGraphData.length > 0) {
+          const maxValue = Math.max(...liveGraphData.map(point => point.y));
+          const yMax = Math.max(50, Math.ceil(maxValue * 1.2 / 10) * 10);
+          liveChart.updateOptions({
+            yaxis: { min: 0, max: yMax }
+          }, false, true);
+        }
+      } catch (error) {
+        console.error('Live graph update error:', error);
+      }
+    }
+    
     document.getElementById('scaleToggle').addEventListener('click', () => {
       autoScale = !autoScale;
       const button = document.getElementById('scaleToggle');
       button.textContent = autoScale ? 'Fixed Scale' : 'Auto Scale';
-      
       if (autoScale) {
-        // Apply auto-scaling
         if (liveGraphData.length > 0) {
-          const maxValue = Math.max(...liveGraphData.map(point => point[1]));
+          const maxValue = Math.max(...liveGraphData.map(point => point.y));
           const yMax = Math.max(50, Math.ceil(maxValue * 1.2 / 10) * 10);
           liveChart.updateOptions({
             yaxis: { min: 0, max: yMax }
-          });
+          }, false, true);
         }
       } else {
-        // Reset to fixed scale
         liveChart.updateOptions({
           yaxis: { min: 0, max: 400 }
-        });
+        }, false, true);
       }
     });
     
-    // Camera functionality
     const cameraBtn = document.getElementById('cameraBtn');
     const videoUpload = document.getElementById('videoUpload');
     const videoContainer = document.getElementById('videoContainer');
@@ -1206,7 +1147,6 @@
     const closeVideoBtn = document.getElementById('closeVideoBtn');
     const flashlightBtn = document.getElementById('flashlightBtn');
     const liveGraphContainer = document.getElementById('liveGraphContainer');
-    
     let stream = null;
     let flashlightOn = false;
     let deviceId = 'mobile-camera-' + Date.now();
@@ -1215,20 +1155,17 @@
       const hostname = window.location.hostname;
       const isRailway = hostname.includes('railway.app');
       const isLocalhost = hostname === 'localhost' || hostname === '127.0.0.1';
-      
       if (!window.isSecureContext && !isRailway) {
-        console.warn('⚠️ Camera requires secure context');
+        console.warn('⚠ Camera requires secure context');
         if (cameraBtn) {
           cameraBtn.textContent = '🔒 Camera (Requires HTTPS)';
           cameraBtn.disabled = true;
         }
         return false;
       }
-      
       if (!navigator.mediaDevices) {
         navigator.mediaDevices = {};
       }
-      
       if (!navigator.mediaDevices.getUserMedia) {
         const getUserMedia = navigator.webkitGetUserMedia || navigator.mozGetUserMedia;
         if (!getUserMedia) {
@@ -1240,7 +1177,6 @@
           });
         };
       }
-      
       return true;
     }
     
@@ -1251,16 +1187,13 @@
         alert('📱 Camera requires HTTPS or localhost');
         return;
       }
-      
       if (!navigator.onLine) {
         alert('📴 Camera not available offline');
         return;
       }
-      
       try {
         const devices = await navigator.mediaDevices.enumerateDevices();
         const videoDevices = devices.filter(d => d.kind === 'videoinput');
-        
         let selectedCamera = null;
         for (const device of videoDevices) {
           const label = device.label.toLowerCase();
@@ -1269,7 +1202,6 @@
             break;
           }
         }
-        
         const constraints = {
           video: {
             deviceId: selectedCamera ? { exact: selectedCamera } : undefined,
@@ -1279,35 +1211,24 @@
             frameRate: { ideal: 15, max: 20 }
           }
         };
-        
         stream = await navigator.mediaDevices.getUserMedia(constraints);
         videoElement.srcObject = stream;
         videoContainer.classList.add('active');
         liveGraphContainer.classList.add('active');
-        
         const track = stream.getVideoTracks()[0];
         const settings = track.getSettings();
-        
-        videoInfoOverlay.innerHTML = `
-          <div class="video-info">
-            📹 ${settings.width}x${settings.height} @ ${settings.frameRate}fps
-          </div>
-        `;
-        
+        videoInfoOverlay.innerHTML = '<div class="video-info">📹 ' + settings.width + 'x' + settings.height + ' @ ' + settings.frameRate + 'fps</div>';
         startProcessingCameraFrames();
-        
       } catch (err) {
         console.error('Camera error:', err);
         let errorMessage = 'Could not access camera: ' + err.message;
-        
         if (err.name === 'NotAllowedError') {
           errorMessage = '🚫 Camera access denied. Please allow camera access.';
         } else if (err.name === 'NotFoundError') {
           errorMessage = '📷 No camera found on this device.';
         } else if (err.name === 'NotReadableError') {
-          errorMessage = '⚠️ Camera is in use by another app.';
+          errorMessage = '⚠ Camera is in use by another app.';
         }
-        
         alert(errorMessage);
       }
     });
@@ -1316,10 +1237,8 @@
     
     flashlightBtn.addEventListener('click', async () => {
       if (!stream) return;
-      
       const track = stream.getVideoTracks()[0];
       const capabilities = track.getCapabilities();
-      
       if (capabilities.torch) {
         flashlightOn = !flashlightOn;
         try {
@@ -1327,7 +1246,7 @@
           flashlightBtn.textContent = flashlightOn ? '🔦' : '💡';
         } catch (err) {
           console.error('Flashlight error:', err);
-          alert('⚠️ Could not toggle flashlight');
+          alert('⚠ Could not toggle flashlight');
         }
       } else {
         alert('💡 Flashlight not supported');
@@ -1340,7 +1259,6 @@
         e.target.value = '';
         return;
       }
-      
       const file = e.target.files[0];
       if (file) {
         stopCamera();
@@ -1348,7 +1266,6 @@
         videoElement.src = videoURL;
         videoElement.srcObject = null;
         videoContainer.classList.add('active');
-        
         videoElement.onloadedmetadata = () => {
           videoElement.play();
           startProcessingVideoFrames();
@@ -1365,8 +1282,6 @@
       videoElement.src = '';
       videoContainer.classList.remove('active');
       liveGraphContainer.classList.remove('active');
-      
-      // Clear live graph data
       liveGraphData = [];
       liveChart.updateSeries([{ name: 'Goosebump intensity', data: [] }]);
     }
@@ -1377,14 +1292,11 @@
       let captureInterval = 180;
       let frameCount = 0;
       let isProcessing = false;
-      
       const cameraDeviceId = 'mobile-camera-' + Date.now();
       deviceLastActive.set(cameraDeviceId, Date.now());
-      
       const updateCanvasSize = () => {
         const videoWidth = videoElement.videoWidth;
         const videoHeight = videoElement.videoHeight;
-        
         if (videoWidth && videoHeight) {
           canvas.width = videoWidth;
           canvas.height = videoHeight;
@@ -1392,76 +1304,50 @@
         }
         return false;
       };
-      
       updateCanvasSize();
-      
       const captureFrame = () => {
         if (!stream || isProcessing) return;
-        
         isProcessing = true;
-        
         try {
           if (frameCount % 60 === 0) updateCanvasSize();
-          
           const targetWidth = Math.min(canvas.width, 640);
           const targetHeight = Math.min(canvas.height, 480);
-          
           if (canvas.width !== targetWidth || canvas.height !== targetHeight) {
             canvas.width = targetWidth;
             canvas.height = targetHeight;
           }
-          
           ctx.drawImage(videoElement, 0, 0, targetWidth, targetHeight);
-          
           canvas.toBlob((blob) => {
             if (!blob) {
               isProcessing = false;
               scheduleNextFrame();
               return;
             }
-            
             frameCount++;
-            
-            // Convert blob to ArrayBuffer for binary Socket.IO transport
             const reader = new FileReader();
             reader.onloadend = () => {
-              const arrayBuf = reader.result; // ArrayBuffer
-              
-              // Send binary data via Socket.IO for real-time performance
-              socket.emit('frame_jpeg', 
-                { device_id: cameraDeviceId, frame_number: frameCount }, 
-                arrayBuf
-              );
-              
-              // Update device activity
+              const arrayBuf = reader.result;
+              socket.emit('frame_jpeg', { device_id: cameraDeviceId, frame_number: frameCount }, arrayBuf);
               deviceLastActive.set(cameraDeviceId, Date.now());
-              
-              // Note: Actual detection results will come via socket 'frame' event
-              // This provides much lower latency than HTTP requests
-              
               isProcessing = false;
               scheduleNextFrame();
             };
-            
             reader.onerror = () => {
               console.error('Error reading blob data');
               isProcessing = false;
               scheduleNextFrame();
             };
-            
-            reader.readAsArrayBuffer(blob); // Read as ArrayBuffer for binary transport
-          }, 'image/jpeg', 0.6); // Optimized quality for real-time
+            reader.readAsArrayBuffer(blob);
+          }, 'image/jpeg', 0.6);
         } catch (err) {
           console.error('Frame capture error:', err);
           isProcessing = false;
           scheduleNextFrame();
         }
       };
-      
       const scheduleNextFrame = () => {
         if (stream) setTimeout(captureFrame, captureInterval);
       };
-      
       videoElement.addEventListener('playing', () => {
         if (updateCanvasSize()) {
           captureFrame();
@@ -1484,25 +1370,19 @@
       const ctx = canvas.getContext('2d');
       const captureInterval = 200;
       let frameCount = 0;
-      
       canvas.width = videoElement.videoWidth || 640;
       canvas.height = videoElement.videoHeight || 480;
-      
       const videoUploadId = 'video-upload-' + Date.now();
       deviceLastActive.set(videoUploadId, Date.now());
-      
       const captureFrame = () => {
         if (videoElement.paused || videoElement.ended) return;
-        
         try {
           ctx.drawImage(videoElement, 0, 0, canvas.width, canvas.height);
           frameCount++;
-          
           canvas.toBlob((blob) => {
             const reader = new FileReader();
             reader.onloadend = () => {
               const base64data = reader.result.split(',')[1];
-              
               fetch('/upload_frame', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -1511,16 +1391,12 @@
                   jpg_b64: base64data,
                   frame_number: frameCount
                 })
-              })
-              .then(response => response.json())
-              .then(data => {
+              }).then(response => response.json()).then(data => {
                 deviceLastActive.set(videoUploadId, Date.now());
-              })
-              .catch(err => console.error('Frame send error:', err));
+              }).catch(err => console.error('Frame send error:', err));
             };
             reader.readAsDataURL(blob);
           }, 'image/jpeg', 0.8);
-          
           if (!videoElement.paused && !videoElement.ended) {
             setTimeout(captureFrame, captureInterval);
           }
@@ -1531,64 +1407,12 @@
           }
         }
       };
-      
       captureFrame();
     }
     
-    let lastGraphUpdate = 0;
-    const GRAPH_UPDATE_INTERVAL = 1000;
-    
-    // Store live graph data
-    let liveGraphData = [];
-    let autoScale = false;
-    
-    function updateLiveGraph(intensity, frame) {
-      try {
-        console.log(`Updating live graph: Frame ${frame}, Intensity ${intensity}`);
-        
-        // Visual feedback - briefly highlight the graph title
-        const graphTitle = document.querySelector('.graph-title');
-        if (graphTitle) {
-          graphTitle.style.color = '#ff0000';
-          setTimeout(() => {
-            graphTitle.style.color = 'var(--lionsmane)';
-          }, 200);
-        }
-        
-        // Add new data point
-        liveGraphData.push([frame, intensity]);
-        
-        // Keep only last 250 points for performance
-        if (liveGraphData.length > 250) {
-          liveGraphData = liveGraphData.slice(-250);
-        }
-        
-        // Update the chart with all data
-        liveChart.updateSeries([{
-          name: 'Goosebump intensity',
-          data: liveGraphData
-        }]);
-        
-        // Auto-scale Y-axis if enabled
-        if (autoScale && liveGraphData.length > 0) {
-          const maxValue = Math.max(...liveGraphData.map(point => point[1]));
-          const yMax = Math.max(50, Math.ceil(maxValue * 1.2 / 10) * 10); // Round up to nearest 10
-          liveChart.updateOptions({
-            yaxis: { min: 0, max: yMax }
-          });
-        }
-        
-      } catch (error) {
-        console.error('Live graph update error:', error);
-      }
-    }
-
-    
-    // Connection handling
     socket.on('connect', () => {
       console.log('✅ Connected to server');
     });
-    
     socket.on('disconnect', () => {
       console.log('❌ Disconnected from server');
     });
