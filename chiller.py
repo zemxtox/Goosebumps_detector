@@ -80,6 +80,7 @@ class ChillerState:
     last_processed_frame: int = 0
     skip_frames: int = 2  # Process every 3rd frame for camera feeds
     _last_emit_ts: float = 0.0  # For emit throttling
+    _above_threshold_count: int = 0  # For detection stability
 
 device_states: Dict[str, ChillerState] = {}
 
@@ -299,43 +300,57 @@ def process_and_emit_frame(img_color, st, device_id, is_upload=False):
         
         st.max_intensity_seen = max(st.max_intensity_seen, st.current_intensity)
     
-    # === DETECTION LOGIC === (unchanged)
+    # === DETECTION LOGIC WITH STABILITY === 
     detect = False
     threshold = VIDEO_DETECTION_THRESHOLD if is_upload else DETECTION_THRESHOLD
     
-    if st.baseline_established and st.current_intensity >= threshold:
-        detect = True
-        st.detection_count += 1
+    if st.baseline_established:
+        # Hysteresis thresholds for stability
+        high_threshold = threshold
+        low_threshold = threshold * 0.7  # 70% of main threshold for release
         
-        led_intensity = st.current_intensity - threshold
-        st.led_level = int(np.clip(
-            LED_MIN_LEVEL + (led_intensity / 50.0) * (LED_MAX_LEVEL - LED_MIN_LEVEL),
-            LED_MIN_LEVEL,
-            LED_MAX_LEVEL
-        ))
+        # Track consecutive frames above threshold
+        if st.current_intensity >= high_threshold:
+            st._above_threshold_count += 1
+        elif st.current_intensity < low_threshold:
+            st._above_threshold_count = 0
+        # If between thresholds, maintain current count (hysteresis)
         
-        status = f"GOOSEBUMP_DETECTED"
-        
-        # Async save detection
-        if SAVE_DETECTIONS:
-            try:
-                ts = datetime.now().strftime("%Y%m%d_%H%M%S")
-                viz = img_color.copy()
-                cv2.rectangle(viz, (st.roi_x, st.roi_y),
-                            (st.roi_x + ROI_WIDTH, st.roi_y + ROI_HEIGHT),
-                            (0, 255, 0), 2)
-                text = f"GOOSEBUMPS: {st.current_intensity:.1f}%"
-                cv2.putText(viz, text, (10, 30), 
-                          cv2.FONT_HERSHEY_SIMPLEX, 1.0, (0, 255, 0), 2)
-                
-                fname = f"{device_id}_gb_{ts}_i{st.current_intensity:.0f}.jpg"
-                cv2.imwrite(os.path.join(DETECTION_DIR, fname), viz)
-            except Exception as e:
-                print(f"[WARN] Save error: {e}")
-    else:
-        if st.baseline_established:
+        # Require 3 consecutive frames above threshold to trigger detection
+        if st._above_threshold_count >= 3:
+            detect = True
+            st.detection_count += 1
+            
+            led_intensity = st.current_intensity - threshold
+            st.led_level = int(np.clip(
+                LED_MIN_LEVEL + (led_intensity / 50.0) * (LED_MAX_LEVEL - LED_MIN_LEVEL),
+                LED_MIN_LEVEL,
+                LED_MAX_LEVEL
+            ))
+            
+            status = f"GOOSEBUMP_DETECTED"
+            
+            # Async save detection (only on first detection of sequence)
+            if SAVE_DETECTIONS and st._above_threshold_count == 3:
+                try:
+                    ts = datetime.now().strftime("%Y%m%d_%H%M%S")
+                    viz = img_color.copy()
+                    cv2.rectangle(viz, (st.roi_x, st.roi_y),
+                                (st.roi_x + ROI_WIDTH, st.roi_y + ROI_HEIGHT),
+                                (0, 255, 0), 2)
+                    text = f"GOOSEBUMPS: {st.current_intensity:.1f}%"
+                    cv2.putText(viz, text, (10, 30), 
+                              cv2.FONT_HERSHEY_SIMPLEX, 1.0, (0, 255, 0), 2)
+                    
+                    fname = f"{device_id}_gb_{ts}_i{st.current_intensity:.0f}.jpg"
+                    cv2.imwrite(os.path.join(DETECTION_DIR, fname), viz)
+                except Exception as e:
+                    print(f"[WARN] Save error: {e}")
+        else:
             status = "monitoring"
             st.led_level = 0
+    else:
+        st._above_threshold_count = 0
 
     # --- only throttle the UI emit, not the compute ---
     now = time.time()
@@ -493,6 +508,7 @@ def reset_baseline(device_id):
         st.baseline_established = False
         st.current_intensity = 0.0
         st.led_level = 0
+        st._above_threshold_count = 0  # Reset stability counter
         print(f"[RESET] Baseline reset for {device_id}")
         return jsonify({"status": "baseline_reset", "device_id": device_id})
     return jsonify({"error": "device_not_found"}), 404
