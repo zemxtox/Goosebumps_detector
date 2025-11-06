@@ -1009,7 +1009,7 @@
         // Update live graph for camera feed
         if (data.baseline_established) {
           updateLiveGraph(data.goosebump_intensity, data.frame_number);
-}
+        }
 
       }
       
@@ -1054,6 +1054,16 @@
         if (series.length > 250) {
           series.splice(0, series.length - 250);
           entry.chart.updateSeries([{ data: series }], false);
+        }
+        
+        // Also update live graph if this device is selected or showing all devices
+        if (selectedDevice === '__all__' || selectedDevice === data.device_id) {
+          // Show live graph container if not already visible
+          const liveGraphContainer = document.getElementById('liveGraphContainer');
+          if (liveGraphContainer && !liveGraphContainer.classList.contains('active')) {
+            liveGraphContainer.classList.add('active');
+          }
+          updateLiveGraph(data.goosebump_intensity, data.frame_number);
         }
       }
 
@@ -1458,11 +1468,16 @@
     const GRAPH_UPDATE_INTERVAL = 1000;
     
     function updateLiveGraph(intensity, frame) {
-      liveChart.appendData([{ data: [[frame, intensity]] }]);
-      const series = liveChart.w.config.series[0].data;
-      if (series.length > 250) {
-        series.splice(0, series.length - 250);
-        liveChart.updateSeries([{ data: series }], false);
+      try {
+        console.log(`Updating live graph: Frame ${frame}, Intensity ${intensity}`);
+        liveChart.appendData([{ data: [[frame, intensity]] }]);
+        const series = liveChart.w.config.series[0].data;
+        if (series.length > 250) {
+          series.splice(0, series.length - 250);
+          liveChart.updateSeries([{ data: series }], false);
+        }
+      } catch (error) {
+        console.error('Live graph update error:', error);
       }
     }
 
