@@ -759,84 +759,49 @@
     
     // ApexCharts configuration
     const chartOptions = {
-      chart: {
-        type: 'area',
-        height: 220,
-        animations: {
-          enabled: true,
-          easing: 'linear',
-          dynamicAnimation: {
-            speed: 500
-          }
-        },
-        toolbar: { show: false },
-        zoom: { enabled: false },
-        background: 'transparent'
-      },
-      stroke: {
-        curve: 'smooth',
-        width: 3
-      },
-      fill: {
-        type: 'gradient',
-        gradient: {
-          shadeIntensity: 1,
-          opacityFrom: 0.7,
-          opacityTo: 0.3,
-          stops: [0, 90, 100]
-        }
-      },
-      dataLabels: { enabled: false },
-      xaxis: {
-        type: 'datetime',
-        labels: {
-          style: { colors: '#fff' },
-          datetimeFormatter: {
-            hour: 'HH:mm:ss'
-          }
-        },
-        axisBorder: { color: 'rgba(255,255,255,0.2)' },
-        axisTicks: { color: 'rgba(255,255,255,0.2)' }
-      },
-      yaxis: {
-        min: -10,
-        max: 100,
-        labels: {
-          style: { colors: '#fff' },
-          formatter: (val) => val.toFixed(0) + '%'
-        },
-        title: {
-          text: 'Intensity (%)',
-          style: { color: '#fff' }
-        }
-      },
-      grid: {
-        borderColor: 'rgba(255,255,255,0.1)',
-        strokeDashArray: 3
-      },
-      tooltip: {
-        theme: 'dark',
-        x: { format: 'HH:mm:ss' }
-      },
-      colors: ['#51cf66'],
-      theme: { mode: 'dark' }
-    };
-    
-    // Live graph
-    const liveGraphOptions = {
-      ...chartOptions,
-      chart: {
-        ...chartOptions.chart,
-        id: 'live-graph',
-        height: 300
-      }
-    };
-    
-    let liveChart = new ApexCharts(document.querySelector("#liveGraph"), {
-      ...liveGraphOptions,
-      series: [{ name: 'Intensity', data: [] }]
-    });
-    liveChart.render();
+    chart: {
+    type: 'line',
+    height: 220,
+    background: 'transparent',
+    animations: { enabled: true, easing: 'linear', dynamicAnimation: { speed: 400 } },
+    toolbar: { show: false },
+    zoom: { enabled: false }
+  },
+  stroke: { curve: 'straight', width: 2 },   // clean red line
+  markers: { size: 0 },
+  fill: { type: 'solid', opacity: 0 },       // no area fill
+  dataLabels: { enabled: false },
+  xaxis: {
+    type: 'numeric',
+    title: { text: 'Frame', style: { color: '#fff', fontWeight: 700 }},
+    labels: { style: { colors: '#fff' } },
+    axisBorder: { color: 'rgba(255,255,255,0.2)' },
+    axisTicks: { color: 'rgba(255,255,255,0.2)' }
+  },
+  yaxis: {
+  min: 0,
+  forceNiceScale: true,
+  decimalsInFloat: 0,
+  title: { text: 'Goosebump intensity', style: { color: '#fff', fontWeight: 700 }},
+  labels: { style: { colors: '#fff' } }
+},
+
+  grid: { borderColor: 'rgba(255,255,255,0.1)', strokeDashArray: 3 },
+  tooltip: { theme: 'dark' },
+  // red line color
+  colors: ['#ff0000'],
+  theme: { mode: 'dark' }
+};
+
+  const liveGraphOptions = { ...chartOptions, chart: { ...chartOptions.chart, id: 'live-graph', height: 300 } };
+
+  const chart = new ApexCharts(chartWrap, {
+  ...chartOptions,
+  series: [{ name: 'Goosebump intensity', data: [] }]
+});
+
+  liveChart.render();
+
     
     function buildCard(id) {
       if (deviceCards.has(id)) return deviceCards.get(id);
@@ -1045,8 +1010,9 @@
         
         // Update live graph for camera feed
         if (data.baseline_established) {
-          updateLiveGraph(data.goosebump_intensity);
-        }
+          updateLiveGraph(data.goosebump_intensity, data.frame_number);
+}
+
       }
       
       entry.root.style.display = 'flex';
@@ -1083,18 +1049,16 @@
       
       // Update chart
       if (data.baseline_established) {
-        const timestamp = new Date().getTime();
-        entry.chart.appendData([{
-          data: [[timestamp, data.goosebump_intensity]]
-        }]);
-        
-        // Keep only last 60 points
-        const series = entry.chart.w.config.series[0].data;
-        if (series.length > 60) {
-          series.shift();
-          entry.chart.updateSeries([{ data: series }], false);
-        }
-      }
+      entry.chart.appendData([{ data: [[data.frame_number, data.goosebump_intensity]] }]);
+
+  // Keep only last 250 points (or whatever you prefer)
+      const series = entry.chart.w.config.series[0].data;
+      if (series.length > 250) {
+      series.splice(0, series.length - 250);
+      entry.chart.updateSeries([{ data: series }], false);
+  }
+}
+
       
       // Track detections
       if (data.detect) {
@@ -1495,23 +1459,15 @@
     let lastGraphUpdate = 0;
     const GRAPH_UPDATE_INTERVAL = 1000;
     
-    function updateLiveGraph(intensity) {
-      const now = Date.now();
-      
-      if (now - lastGraphUpdate < GRAPH_UPDATE_INTERVAL) return;
-      
-      lastGraphUpdate = now;
-      
-      liveChart.appendData([{
-        data: [[now, intensity]]
-      }]);
-      
+    function updateLiveGraph(intensity, frame) {
+      liveChart.appendData([{ data: [[frame, intensity]] }]);
       const series = liveChart.w.config.series[0].data;
-      if (series.length > 60) {
-        series.shift();
+      if (series.length > 250) {
+        series.splice(0, series.length - 250);
         liveChart.updateSeries([{ data: series }], false);
-      }
-    }
+  }
+}
+
     
     // Connection handling
     socket.on('connect', () => {
@@ -1524,4 +1480,3 @@
   </script>
 </body>
 </html>
-
